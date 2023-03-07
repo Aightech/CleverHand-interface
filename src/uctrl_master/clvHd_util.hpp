@@ -15,28 +15,71 @@ class ClvHdEMG
     void begin()
     {
       SPI.begin();
-      SPI.beginTransaction(SPISettings(20000000, MSBFIRST, SPI_MODE0));
+      SPI.beginTransaction(SPISettings(5000000, MSBFIRST, SPI_MODE0));
       for (int i = 0; i < 4; i++)
         pinMode(m_addPins[i], OUTPUT);
       pinMode(m_gpio1Pin, OUTPUT);
-      digitalWrite(m_gpio1Pin, LOW);
-      delay(100);
+      digitalWrite(m_gpio1Pin, HIGH);
+      
+      //pinMode(12, INPUT);
+      //digitalWrite(12, LOW);
+
+      // selectBrd(0);
+      // uint8_t val = 0;
+      // while(1){
+      //     m_nb_board = 0;
+      //   byte val = 0;
+      //   for (unsigned i = 15; i >0; i--)
+      //   {
+          
+      //     //Serial.print(i);
+      //     //Serial.print(" ");
+      //     readRegister(0x40, &val, 1, i);
+      //     //Serial.println((int)val);
+      //     if (val == 0x01)
+      //       m_nb_board++;
+      //     //selectBrd(i);
+      //   }
+      //   Serial.println((int)m_nb_board);
+
+      //   delay(1);
+      // };
 
       this->m_nb_board = nb_emg_connected();
-
       
-      digitalWrite(m_gpio1Pin, HIGH);
-      for(int i =0;;i++)
-      {
-        selectBrd(13+i%2);
-        delay(2000);
-      }
-//
-//      // quick blink on available modules
-//
+      //Serial.println("hey");
+      //Serial.println(this->m_nb_board);
+      
+      // int id=14;
+      // int dt_cs=5;
+      // int n=5;
+      // selectBrd(id);
+      // for (int i = 0; i < 2*n; i++)
+      // {
+      //   digitalWrite(m_gpio1Pin, i % 2);
+      //   delay(dt_cs*10);
+      // }
+      // for (int j = 15; j > 15 - 8; j--)
+      // {
+      //   selectBrd(j);
+      //   delay(1000);
+      // }  
+      
+      
+      //while(1);
+      
 //      digitalWrite(m_gpio1Pin, HIGH);
-//      for (int j = 15; j > 15 - this->m_nb_board; j--)
-//        this->blink(j, 5, m_nb_board);
+//      for(int i =0;;i++)
+//      {
+//        selectBrd(13+i%2);
+//        delay(200);
+//      }
+//
+      // quick blink on available modules
+
+      digitalWrite(m_gpio1Pin, HIGH);
+      for (int j = 15; j > 15 -this->m_nb_board ; j--)
+        this->blink(j, 2, 3);
     };
 
     //Select the module by activating the coreponding address pins.
@@ -50,7 +93,7 @@ class ClvHdEMG
     // All values are store in the val buff
     void readRegister(byte reg, byte val[], unsigned n = 1, uint8_t id = 15, bool order = true)
     {
-      byte dataToSend = READ | (REG_MASK & reg);
+      byte dataToSend  = READ | (REG_MASK & reg);
 
       selectBrd(id);
       SPI.transfer(dataToSend);
@@ -60,7 +103,7 @@ class ClvHdEMG
       else
         for (unsigned i = n - 1; i >= 0; i--)
           *(val + i) = SPI.transfer(0x00);
-      selectBrd(0x0e - m_nb_board);
+      selectBrd(0x00);
     }
 
     // Write 1 byte to the reg address of the module coreponding to id.
@@ -71,7 +114,7 @@ class ClvHdEMG
       selectBrd(id);
       SPI.transfer(dataToSend);
       SPI.transfer(val);
-      selectBrd(0x0e - m_nb_board);
+      selectBrd(0x00);
     }
 
     // Scan available modules.
@@ -79,14 +122,17 @@ class ClvHdEMG
     {
       m_nb_board = 0;
       byte val = 0;
-      for (unsigned i = 0; i < 16; i++)
+      for (unsigned i = 15; i >0; i--)
       {
-        Serial.print(i);
-        Serial.print(" ");
+        
+        //Serial.print(i);
+        //Serial.print(" ");
         readRegister(0x40, &val, 1, i);
-        Serial.println((int)val);
+        //Serial.println((int)val);
         if (val == 0x01)
           m_nb_board++;
+        selectBrd(i);
+        delay(100);
       }
       return m_nb_board;
     }
@@ -115,5 +161,5 @@ class ClvHdEMG
     const int m_gpio1Pin = 6;
     const int m_resetPin = 14;
     int m_nb_board = 0;
-
+    uint8_t m_buffer[1024]; 
 };

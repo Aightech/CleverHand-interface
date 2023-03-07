@@ -12,6 +12,7 @@
 #include "strANSIseq.hpp"
 #include <stdint.h> // uint8_t, uint16_t, uint32_t, uint64_t
 
+
 namespace ClvHd
 {
 class Master;
@@ -22,6 +23,26 @@ class Master;
  * This class is used to read EMG data from the ClvHd board.
  */
 class EMG
+{
+    public:
+x
+    public:
+    EMG(Master *master, int id);
+    ~EMG();
+
+    virtual int
+    set_config(Config config);
+
+    virtual double
+    get_value(int ch, int precision = 2, bool fetch = true);
+
+    private:
+    Master *m_master;
+    int m_id;
+    bool m_verbose = true;
+};
+
+class EMG_V2 : public EMG
 {
     public:
     typedef struct
@@ -51,12 +72,31 @@ class EMG
     };
 
     public:
-    EMG(Master *master, int id);
-    ~EMG();
+    EMG_V2(Master *master, int id);
+    ~EMG_V2();
+
+    int
+    set_config(Config config)
+    {
+        this->setup(config.route_table, config.chx_enable, config.chx_high_res,
+                    config.chx_high_freq, config.R1, config.R2[0], config.R3);
+        return 0;
+    }
+
+    double
+    get_value(int ch, int precision = 2, bool fetch = true)
+    {
+        if(fetch)
+            return (precision == 2) ? this->read_fast_value(ch)
+                                    : this->read_precise_value(ch);
+        else
+            return (precision == 2) ? this->fast_value(ch)
+                                    : this->precise_value(ch);
+    };
 
     /**
      * @brief setup Write all setup parameters to the board.
-     * 
+     *
      * @param route_table Routing configuration of the EMG channels.
      * @param chx_enable Select which INA channels are enabled.
      * @param chx_high_res Select if the INA channels are high resolution.

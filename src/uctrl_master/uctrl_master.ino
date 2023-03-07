@@ -1,5 +1,5 @@
 //#define TEENSY_41
-#define IOT33
+//#define IOT33
 //#define UDP_MODE
 #define VERSION 0x0200
 #include "clvHd_util.hpp"
@@ -22,9 +22,9 @@ Com com_interface;
 void setup()
 {
   
-  Serial.begin(9600);
+  //Serial.begin(500000);
   while(!Serial){}
-  com_interface.begin(9600);//, 5000, 192, 168, 127, 253);
+  com_interface.begin(500000);//, 5000, 192, 168, 127, 253);
   clvHdEMG.begin();
   
 }
@@ -38,17 +38,29 @@ void loop()
     com_interface.read(buff, pkgSize);
     switch (buff[0])
     {
-      case 'r':// Reading cmd > 'r' | id | reg | n
+      case 'r':// Reading cmd > 'r' | id | reg | n : read n bytes starting from reg
         {
           clvHdEMG.readRegister(buff[2], vals, buff[3], buff[1]);
           com_interface.write((uint8_t*)vals, buff[3], true);
           break;
         }
-        case 'R':// Reading cmd > 'R' | 0 | reg | n
+        case 'R':// Reading cmd > 'R' | 0 | reg | n : read n bytes starting from reg for each module 
         {
           for(i=0;i<nb;i++)
               clvHdEMG.readRegister(buff[2], vals+buff[3]*i, buff[3], 0xf-i);
+          //memset(((uint8_t*)vals)+3, 0, 4);
+          
+          //(((uint8_t*)vals)+1)[6]=0x40;
+
+          // (((uint8_t*)vals)+1)[9]=0x00;
+          // (((uint8_t*)vals)+1)[10]=0x00;
+          // (((uint8_t*)vals)+1)[11]=0x00;
+
+          // (((uint8_t*)vals)+1)[12]=0x00;
+          // (((uint8_t*)vals)+1)[13]=0x00;
+          // (((uint8_t*)vals)+1)[14]=0x00;
           com_interface.write((uint8_t*)vals, buff[3]*nb, true);
+          //delay(5);
           
           break;
         }
