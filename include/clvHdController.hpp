@@ -16,13 +16,15 @@
 #include <stdint.h> // uint8_t, uint16_t, uint32_t, uint64_t
 #include <stdio.h>  // Standard input/output definitions
 
-#include "clvHdEMG.hpp"  // EMG class
-#include "registers.hpp" // Registers class
+#include "clvHdModule.hpp" // Module class
 #include <serial_client.hpp>
+
+#define CLVHD_PACKET_SIZE 6
+#define CLVHD_BUFFER_SIZE 1024
 
 namespace ClvHd
 {
-class EMG;
+class Module;
 
 /**
  * @brief The CleverHand Controller board class
@@ -40,8 +42,33 @@ class Controller : public Communication::Serial
 
     public:
     Controller(int verbose = -1)
-        : Communication::Serial(verbose), ESC::CLI(verbose, "ClvHd-Controller"){};
-    ~Controller();
+        : Communication::Serial(verbose),
+          ESC::CLI(verbose, "ClvHd-Controller"){};
+    ~Controller()
+    {
+        sendCmd('z');
+        this->close_connection();
+    };
+
+    void
+    setup(uint8_t *data = nullptr)
+    {
+        sendCmd('s');
+    };
+
+    int
+    sendCmd(uint8_t cmd, uint8_t *data = nullptr, size_t size = 0)
+    {
+        uint8_t msg[1 + size] = {cmd};
+        for(int i = 0; i < size; i++) msg[i + 1] = data[i];
+        int n = this->writeS(msg, size + 1);
+        if(n != size + 1)
+        {
+            logln("Error sending command", true);
+            return -1;
+        }
+        return size;
+    };
 
     /**
      * @brief readReply Read a reply from the controller board. The reply contains a timestamp, a size and the data.
@@ -53,12 +80,8 @@ class Controller : public Communication::Serial
     int
     readReply(uint8_t *buff, uint64_t *timestamp = nullptr)
     {
-        //logln("Reading reply", true);
+        // Read the timestamp and the size of the data (8 bytes + 1 byte)
         int n = this->readS(m_buffer, 9);
-        // logln("Read: " + std::to_string(n) + " bytes", true);
-        // logln("timestamp: " + std::to_string(*(uint64_t *)m_buffer) +
-        //           " size: " + std::to_string(m_buffer[8]),
-        //       true);
         if(n == 9)
         {
             if(timestamp != nullptr)
@@ -68,37 +91,6 @@ class Controller : public Communication::Serial
         }
         else
             return -1;
-    };
-
-    /**
-     * @brief sendCmd Send a command to the controller board.
-     *
-     * @param cmd Command to send.
-     * @param id Id of the module to send the command to.
-     * @param data Data to send.
-     * @param size Size of the data to send.
-     * @return int 0 if the command was sent successfully, -1 otherwise.
-     */
-    int
-    sendCmd(uint8_t cmd,
-            uint8_t id = 0,
-            uint8_t *data = nullptr,
-            size_t size = 0)
-    {
-        uint8_t msg[m_packet_size] = {cmd, id};
-        for(int i = 0; i < size; i++) msg[i + 2] = data[i];
-        int n = this->writeS(msg, m_packet_size);
-        // log("Sent: [cmd: " + std::to_string(cmd) + " id: " + std::to_string(id) +
-        //         " data: ",
-        //     true);
-        // for(int i = 0; i < size; i++) log(std::to_string(data[i]) + " ", false);
-        // log("]\n", false);
-        if(n != m_packet_size)
-        {
-            logln("Error sending command", true);
-            return -1;
-        }
-        return size;
     };
 
     /**
@@ -115,9 +107,36 @@ class Controller : public Communication::Serial
             uint8_t reg,
             uint8_t size,
             const void *buff,
-            uint64_t *timestamp = nullptr);
+            uint64_t *timestamp = nullptr)
+    {
+        return readReg_multi(((uint32_t)1) << id, reg, size, buff, timestamp);
+    };
 
     /**
+     * @brief readReg_multi read size byte starting from reg address from the module with the given id.
+     *
+     * @param mask_id Mask of the modules to read from.
+     * @param reg Start address of the data to read.
+     * @param size Number of bytes to read.
+     * @param buff Buffer to store the data.
+     * @return int Number of bytes read.
+     */
+    int
+    readReg_multi(uint32_t mask_id,
+                  uint8_t reg,
+                  uint8_t size,
+                  const void *buff,
+                  uint64_t *timestamp = nullptr)
+    {
+        uint8_t msg[6];
+        *(uint32_t *)msg = mask_id;
+        msg[4] = reg;
+        msg[5] = size;
+        sendCmd('r', msg, 6);
+        return readReply((uint8_t *)buff, timestamp);
+    };
+
+     /**
      * @brief writeReg write one byte to reg address to the module with the given id.
      *
      * @param id Id of the module to write to.
@@ -126,21 +145,63 @@ class Controller : public Communication::Serial
      * @return int Number of bytes written.
      */
     int
-    writeReg(uint8_t id, uint8_t reg, uint8_t val);
+    writeReg(uint8_t id, uint8_t reg, uint8_t val)
+    {
+        return writeReg_multi(((uint32_t)1) << id, reg, 1, &val);
+    };
+
+    /**
+     * @brief writeReg write one byte to reg address to the module with the given id.
+     *
+     * @param id Id of the module to write to.
+     * @param reg Start address of the data to write.
+     * @param size Number of bytes to write.
+     * @param data Data to write.
+     * @return int Number of bytes written.
+     */
+    int
+    writeReg(uint8_t id, uint8_t reg, uint8_t size, const void *data)
+    {
+        return writeReg_multi(((uint32_t)1) << id, reg, size, data);
+    };
+
+    /**
+     * @brief writeReg_multi write size byte starting from reg address to the module with the given id.
+     *
+     * @param mask_id Mask of the modules to write to.
+     * @param reg Start address of the data to write.
+     * @param size Number of bytes to write.
+     * @param data Data to write.
+     * @return int Number of bytes written.
+     */
+    int
+    writeReg_multi(uint32_t mask_id,
+                   uint8_t reg,
+                   uint8_t size,
+                   const void *data)
+    {
+        uint8_t msg[6];
+        *(uint32_t *)msg = mask_id;
+        msg[4] = reg;
+        msg[5] = size;
+        int n = sendCmd('w', msg, 6);
+        return this->writeS((uint8_t *)data, size) + n;
+    };
 
     /**
      * @brief Get the number of modules connected to the controller board.
      * @return The number of modules connected to the controller board.
      */
-    int
+    uint8_t
     getNbModules()
     {
-        sendCmd('n');
-        uint8_t nb_modules;
-        if(readReply(&nb_modules) == sizeof(nb_modules))
-            return nb_modules;
+        sendCmd('n'); // Request the number of modules and their types
+        uint8_t nb = 0;
+        int n = readReply(&nb);
+        if(n == 1)
+            return nb;
         else
-            return -1;
+            return -1; // Error
     };
 
     /**
@@ -151,7 +212,7 @@ class Controller : public Communication::Serial
     test_connection()
     {
         uint8_t arr[3] = {1, 2, 3};
-        int n = sendCmd('m', 0, arr, 3);
+        int n = sendCmd('m', arr, 3);
         uint8_t ans[3];
         if(readReply(ans) == 3)
             return ans[0] == ans[0] && ans[1] == arr[1] && ans[2] == arr[2];
@@ -181,145 +242,10 @@ class Controller : public Communication::Serial
             return "";
     };
 
-    /**
-     * @brief setup Get the number of EMG modules connected to the controller board.
-     * @return int The number of EMG modules connected to the controller board.
-     */
-    int
-    setup();
-
-    /**
-     * @brief setupEMG Setup the EMG module with the given id.
-     *
-     * @param n_board Id of the EMG module to setup.
-     * @param route_table Route table of the EMG module.
-     * @param chx_enable Enable/disable of the EMG module.
-     * @param chx_high_res High resolution of the EMG module.
-     * @param chx_high_freq High frequency of the EMG module.
-     * @param R1 R1 of the EMG module.
-     * @param R2 R2 of the EMG module.
-     * @param R3 R3 of the EMG module.
-     */
-    int
-    setupEMG(int n_board,
-             int route_table[3][2],
-             bool chx_enable[3],
-             bool chx_high_res[3],
-             bool chx_high_freq[3],
-             int R1[3],
-             int R2,
-             int R3[3]);
-
-    /**
-     * @brief data_ready Check if the data is ready to be read from from the given channel of the module with the given id.
-     *
-     * @param id Id of the module to check.
-     * @param channel Channel to check.
-     * @param precise If true, the function will return true if the precise signal (3bytes) of the given channel is ready to be read. If false, the function will return true if the fast signal (2byte) of the given channel is ready to be read.
-     * @return true
-     * @return false
-     */
-    bool
-    data_ready(int id, int channel, bool precise = false);
-
-    /**
-     * @brief read_fast_data Read (actual request to the controller board) the fast data(2byte) from the given channel of the module with the given id.
-     *
-     * @param id Id of the module to read from.
-     * @param channel Channel to read from.
-     * @return double Converted value of the fast data. Unit is mV.
-     */
-    double
-    read_fast_EMG(int id, int channel);
-
-    /**
-     * @brief read_precise_data Read (actual request to the controller board) the precise data(3byte) from the given channel of the module with the given id.
-     *
-     * @param id Id of the module to read from.
-     * @param channel Channel to read from.
-     * @return double Converted value of the precise data. Unit is mV.
-     */
-    double
-    read_precise_EMG(int id, int channel);
-
-    /**
-     * @brief fast_EMG Read the previously requested fast data(2byte) from the given channel of the module with the given id.
-     *
-     * @param id Id of the module to read from.
-     * @param channel Channel to read from.
-     * @return double Converted value of the fast data. Unit is mV.
-     */
-    double
-    fast_EMG(int id, int channel);
-
-    /**
-     * @brief precise_EMG Read the previously requested precise data(3byte) from the given channel of the module with the given id.
-     *
-     * @param id Id of the module to read from.
-     * @param channel Channel to read from.
-     * @return double Converted value of the precise data. Unit is mV.
-     */
-    double
-    precise_EMG(int id, int channel);
-
-    /**
-     * @brief Set all modules to converstion state.
-     */
-    int
-    start_acquisition();
-
-    /**
-     * @brief Set all modules to standby state.
-     */
-    int
-    stop_acquisition();
-
-    /**
-     * @brief Read all data registers (State, 3fast, 3precise) from each available module.
-     */
-    int
-    read_all_signal(uint64_t *timestamp = nullptr);
-
-    /**
-     * @brief get_error Get the active error from the module with the given id.
-     *
-     * @param id Id of the module to read from.
-     * @param verbose If true, the function will return a more detailed error message.
-     * @return std::string A list of the active error.
-     */
-    std::string
-    get_error(int id, bool verbose = false);
-
-    bool
-    error_at(int id, int index);
-
-    operator std::string() const
-    {
-        return "Controller board: " + std::to_string(m_EMG.size()) +
-               " EMG module(s) connected.";
-    };
-
-    std::string
-    repr() const
-    {
-        return "Controller object";
-    };
-
-    EMG &
-    emg(int i)
-    {
-        return *m_EMG[i];
-    };
-
-    std::vector<EMG *> m_EMG;
+    operator std::string() const { return "Controller board"; };
 
     private:
-    bool m_streaming = false;
-    ADS1293_Reg m_streaming_reg;
-    size_t m_streaming_size;
-    std::vector<std::pair<int, uint8_t>> m_streaming_channels;
-    uint8_t m_buffer[512];
-    int m_packet_size = 6;
+    uint8_t m_buffer[CLVHD_BUFFER_SIZE];
 };
 } // namespace ClvHd
 #endif

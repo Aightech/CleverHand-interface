@@ -39,7 +39,7 @@ enum ADS1293_Reg
     DATA_CH0_ECG_REG = 0x37,
     DATA_CH1_ECG_REG = 0x3a,
     DATA_CH2_ECG_REG = 0x3d,
-    REVID_REG = 0x40,
+    REVID_REG = 0x40, // default value is 0x01
     DATA_LOOP_REG = 0x50
 };
 }

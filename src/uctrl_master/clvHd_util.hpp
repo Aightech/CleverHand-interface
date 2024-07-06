@@ -5,12 +5,12 @@
 #define REG_MASK 0b01111111
 
 //class used to unify the different functions used to interact with the EMG modules
-class ClvHdEMG
+class ClvHd
 {
     public:
     // Initialise the SPI bus and the selction pins
-    ClvHdEMG(){};
-    ~ClvHdEMG(){};
+    ClvHd(){};
+    ~ClvHd(){};
 
     void
     begin()
@@ -121,8 +121,8 @@ class ClvHdEMG
 
     private:
     const int m_addPins[5] = {6, 7, 8, 9, 10};
+    int m_nbModule = 0;
     int m_clkPin = 3;
     int m_dataPin = 5;
     int m_outPin = 4;
-    int m_nbModule = 0;
 };
