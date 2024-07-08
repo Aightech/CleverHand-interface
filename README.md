@@ -32,18 +32,36 @@ Request to write a register from a module attached to the controller. There is n
 1. 'w': write command
 2. id : A mask indicating which module to address. **Note**: 0b0110 address module 1 and 2
 3. reg: register to write
-4. val: value to write
+4. n: number of bytes to write starting from reg
+5. val: value to write
 
 
-<img src="https://svg.wavedrom.com/{signal:[{name:'Tx',wave:'x==|==x',data:['w','id','reg','val']},{node:'..A.B'}],head:{text:'Write command'},edge:['A+B 4 bytes']}"/>
+<img src="https://svg.wavedrom.com/{signal:[{name:'Tx',wave:'x==|===|x',data:['w','id','reg','n','val']},{node:'..A.B.C.D'}],head:{text:'Write command'},edge:['A+B 4 bytes','C+D n bytes']}"/>
 
 ```wavedrom
 { signal: [
-  { name: 'Tx', wave: 'x==|==x', data: ['w', 'id', 'reg', 'val'] },
-  {                              node: '..A.B'}
+  { name: 'Tx', wave: 'x==|===|x', data: ['w', 'id', 'reg', 'n', 'val'] },
+  {                              node: '..A.B.C.D'}
 ],
     head: { text: 'Write command' },
-    edge: [ 'A+B 4 bytes' ]
+    edge: [ 'A+B 4 bytes', 'C+D n bytes' ]
+}
+```
+
+### Setup 's' request
+Request to setup the controller. Expected response is the number of modules attached to the controller.
+1. 's': setup command
+
+<img src="https://svg.wavedrom.com/{signal:[{name:'Tx',wave:'x=xxxxx',data:['s']},{name:'Rx',wave:'xx=|==x',data:['ts','1','nb']},{node:'..A.B'}],head:{text:'Setup command'},edge:['A+B 8bytes']}"/>
+
+```wavedrom
+{ signal: [
+  { name: 'Tx', wave: 'x=xxxxx', data: ['s'] },
+  { name: 'Rx', wave: 'xx=|==x', data: ['ts', '1', 'nb']},
+  {                              node: '..A.B'}
+],
+    head: { text: 'Setup command' },
+    edge: [ 'A+B 8bytes' ]
 }
 ```
 
