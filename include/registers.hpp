@@ -66,6 +66,7 @@ enum ADS1293_Reg
     MASK_DRDYB_REG = 0x29,    //Data Ready Pin Mask Control
     MASK_ERR_REG = 0x2a,      //Error Pin Mask Control
     RESERVED_0x2D_REG = 0x2d,
+
     ALARM_FILTER_REG = 0x2E, //Digital Filter for Analog Alarm Signals
     CH_CNFG_REG = 0x2F,      //Configure Channel for Loop Read Back Mode
 
@@ -78,7 +79,7 @@ enum ADS1293_Reg
     DATA_CH1_ECG_REG = 0x3a,  //Channel 2 ECG Data
     DATA_CH2_ECG_REG = 0x3d,  //Channel 3 ECG Data
     REVID_REG = 0x40,         //Revision ID
-    DATA_LOOP_REG = 0x50      //Loop Read Back Data
+
 };
 }
 #endif // REGISTERS_HPP

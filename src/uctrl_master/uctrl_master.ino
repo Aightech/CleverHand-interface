@@ -1,69 +1,80 @@
 #define VERSION_MAJOR 3
 #define VERSION_MINOR 0
-#define PACKAGE_SIZE 6
 #include "clvHd_util.hpp"
 
-uint8_t recv_buff[PACKAGE_SIZE];
+uint8_t recv_buff[64];
 uint8_t send_buff[255];
 uint64_t *timestamp = (uint64_t *)send_buff;
 uint8_t *size_buff = send_buff + 8;
 uint8_t *vals_buff = send_buff + 9;
 int i, n, reg, nb, id, val;
+uint32_t mask_id = 0;
 
-ClvHdEMG clvHdEMG;
+ClvHd clvHd;
 
 void
 setup()
 {
 
     Serial.begin(500000);
-    clvHdEMG.begin();
-    nb = clvHdEMG.nbModules();
+    clvHd.begin();
+    nb = clvHd.nbModules();
     delay(100);
 }
 
 void
 loop()
 {
-    if(Serial.available() >= PACKAGE_SIZE)
+    if(Serial.available() >= 1)
     {
-        Serial.readBytes((char *)recv_buff, PACKAGE_SIZE);
+        recv_buff[0] = Serial.read();
         switch(recv_buff[0])
         {
-        case 'r': // Reading cmd > 'r' | id | reg | n : read n bytes starting from reg
+        case 'r': // Reading cmd > 'r' | mask_id | reg | n : read n bytes starting from reg
         {
-            id = recv_buff[1];
-            reg = recv_buff[2];
-            n = recv_buff[3];
-            *timestamp = micros();
-            if(id == 0xff) //broadcast: read all modules
+            Serial.readBytes(recv_buff + 1, 6);
+            mask_id = *((uint32_t*)(recv_buff + 1));//4 bytes mask_id
+            reg = recv_buff[5]; //1 byte reg
+            n = recv_buff[6]; //1 byte number of bytes to read
+            *timestamp = micros();//8 bytes timestamp stored in send_buff
+            int ir = 0;
+            for(i = 0; i < clvHd.nbModules(); i++)
             {
-                for(i = 0; i < nb; i++)
-                    clvHdEMG.readRegister(reg, vals_buff + n * i, n, i);
-                *size_buff = n * nb;
+                if(mask_id & ((uint32_t)1 << i))//check if the i-th bit is set
+                {
+                    //read n bytes starting from reg address of the module i
+                    //and store them in vals_buff (send_buff + 9)
+                    clvHd.readRegister(reg, vals_buff + n * ir, n, i);
+                    ir++;
+                }
             }
-            else
-            {
-                clvHdEMG.readRegister(reg, vals_buff, n, id);
-                *size_buff = n;
-            }
-            Serial.write(send_buff, 9+*size_buff);
+            *size_buff = n * ir;//number of bytes read (send_buff + 8)
+            Serial.write(send_buff, 9+(*size_buff));
             break;
         }
-        case 'w': // Reading cmd > 'w' | id | reg | val
+        case 'w': //> 'w' | mask id | reg | n | val : write n bytes starting from reg
         {
-            id = recv_buff[1];
-            reg = recv_buff[2];
-            val = recv_buff[3];
-            if(id == 0xff) //broadcast: write to all modules
-                for(i = 0; i < nb; i++) clvHdEMG.writeRegister(reg, val, i);
-            else
-                clvHdEMG.writeRegister(reg, val, id);
+            Serial.readBytes(recv_buff + 1, 6);
+            mask_id = *((uint32_t*)(recv_buff + 1));//4 bytes mask_id
+            reg = recv_buff[5]; //1 byte reg
+            n = recv_buff[6]; //1 byte number of bytes to write
+            Serial.readBytes(recv_buff + 7, n);
+            *timestamp = micros();//8 bytes timestamp stored in send_buff
+            int iw = 0;
+            for(i = 0; i < clvHd.nbModules(); i++)
+            {
+                if(mask_id & ((uint32_t)1 << i))//check if the i-th bit is set
+                {
+                    //write n bytes starting from reg address of the module i
+                    clvHd.writeRegister(reg, recv_buff[7 + iw], i);
+                    iw++;
+                }
+            }
             break;
         }
-        case 'n': // Nb module cmd > 'n' | 0 | 0 | 0
+        case 'n': // Nb module cmd > 'n' 
         {
-            nb = clvHdEMG.nbModules();
+            nb = clvHd.nbModules();
             *timestamp = micros();
             *vals_buff = nb;
             *size_buff = 1;
@@ -85,7 +96,7 @@ loop()
             Serial.write(send_buff, 9+*size_buff);
             break;
         }
-        case 'v': // Version cmd > 'v' | 0 | 0 | 0
+        case 'v': // Version cmd > 'v' 
         {
             *timestamp = micros();
             *(uint8_t *)vals_buff = VERSION_MAJOR;
