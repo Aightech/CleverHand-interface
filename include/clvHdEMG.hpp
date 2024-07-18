@@ -212,7 +212,7 @@ class EMG_ADS1293 : public Module, virtual public ESC::CLI
             if(device.modules[i] == nullptr)
             {
                 uint8_t rev_id = 0;
-                device.controller.readReg(device.modules[i]->id,
+                device.controller.readReg(i,
                                           ADS1293_Reg::REVID_REG, 1, &rev_id);
                 if(rev_id == 0x01) // ADS1293
                 {
@@ -220,7 +220,7 @@ class EMG_ADS1293 : public Module, virtual public ESC::CLI
                     modules_mask |= mask;
                     nb_modules++;
                     EMG_ADS1293 *emg = new EMG_ADS1293(
-                        &device.controller, device.modules[i]->id, verbose);
+                        &device.controller, i, verbose);
                     device.modules[i] = emg;
                     emg->setup(route_table, chx_enable, chx_high_res,
                                chx_high_freq, R1, R2, R3);

@@ -50,10 +50,15 @@ class Controller : public Communication::Serial
         this->close_connection();
     };
 
-    void
-    setup(uint8_t *data = nullptr)
+    uint8_t
+    setup()
     {
+        log("setup controller: ");
         sendCmd('s');
+        uint8_t nb = 0;
+        readReply(&nb);
+        logln(std::to_string(nb) + "modules");
+        return nb;
     };
 
     int
