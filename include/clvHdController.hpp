@@ -43,17 +43,25 @@ class Controller : public Communication::Serial
     public:
     Controller(int verbose = -1)
         : Communication::Serial(verbose),
-          ESC::CLI(verbose, "ClvHd-Controller"){};
+          ESC::CLI(verbose, "ClvHd-Controller") {};
     ~Controller()
     {
         sendCmd('z');
         this->close_connection();
     };
 
-    void
+    uint8_t
     setup(uint8_t *data = nullptr)
     {
+        logln("Setup controller board", true);
         sendCmd('s');
+        uint8_t nb = 0;
+        int n = readReply(&nb);
+        logln("Number of modules found: " + std::to_string(nb), true);
+        if(n == 1)
+            return nb;
+        else
+            return -1; // Error
     };
 
     int
@@ -136,7 +144,7 @@ class Controller : public Communication::Serial
         return readReply((uint8_t *)buff, timestamp);
     };
 
-     /**
+    /**
      * @brief writeReg write one byte to reg address to the module with the given id.
      *
      * @param id Id of the module to write to.

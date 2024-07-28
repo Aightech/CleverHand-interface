@@ -17,9 +17,8 @@ setup()
 {
 
     Serial.begin(500000);
+    delay(1000);
     clvHd.begin();
-    nb = clvHd.nbModules();
-    delay(100);
 }
 
 void
@@ -32,7 +31,7 @@ loop()
         {
         case 'r': // Reading cmd > 'r' | mask_id | reg | n : read n bytes starting from reg
         {
-            Serial.readBytes(recv_buff + 1, 6);
+            Serial.readBytes((char*)recv_buff + 1, 6);
             mask_id = *((uint32_t*)(recv_buff + 1));//4 bytes mask_id
             reg = recv_buff[5]; //1 byte reg
             n = recv_buff[6]; //1 byte number of bytes to read
@@ -54,11 +53,11 @@ loop()
         }
         case 'w': //> 'w' | mask id | reg | n | val : write n bytes starting from reg
         {
-            Serial.readBytes(recv_buff + 1, 6);
+            Serial.readBytes((char*)recv_buff + 1, 6);
             mask_id = *((uint32_t*)(recv_buff + 1));//4 bytes mask_id
             reg = recv_buff[5]; //1 byte reg
             n = recv_buff[6]; //1 byte number of bytes to write
-            Serial.readBytes(recv_buff + 7, n);
+            Serial.readBytes((char*)recv_buff + 7, n);
             *timestamp = micros();//8 bytes timestamp stored in send_buff
             int iw = 0;
             for(i = 0; i < clvHd.nbModules(); i++)
@@ -84,6 +83,29 @@ loop()
         }
         case 'b': // Blink cmd > 'b' | id | time_cs | nb_repeat
         {
+            break;
+        }
+        case 's': // Set pin cmd > 's' | id | pin | state
+        {
+            //init clvHd
+            uint8_t n = clvHd.initModules();
+            *timestamp = 0;//micros();
+            *vals_buff = n;
+            *size_buff = 1;
+            Serial.write(send_buff, 9+*size_buff);
+            break;
+        }
+        case 'i': // I2c cmd > 'i' | id
+        {
+            Serial.readBytes((char*)recv_buff + 1, 5);
+            //i2c communication
+            uint8_t id = recv_buff[1];
+            Wire.beginTransmission(id);
+            Wire.write(recv_buff[2]);
+            Wire.write(recv_buff[3]);
+            Wire.write(recv_buff[4]);
+            Wire.write(recv_buff[5]);
+            Wire.endTransmission();
             break;
         }
         case 'm': // Mirror cmd > 'm' | b1 | b2 | b3

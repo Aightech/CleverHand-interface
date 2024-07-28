@@ -209,22 +209,26 @@ class EMG_ADS1293 : public Module, virtual public ESC::CLI
         //for each module read the registers REG_ID
         for(int i = 0; i < device.nb_modules; i++)
         {
+            std::cout << "[ADS1293_test] module " << i << ": ";
             if(device.modules[i] == nullptr)
             {
                 uint8_t rev_id = 0;
-                device.controller.readReg(device.modules[i]->id,
-                                          ADS1293_Reg::REVID_REG, 1, &rev_id);
+                device.controller.readReg(i, ADS1293_Reg::REVID_REG, 1,
+                                          &rev_id);
                 if(rev_id == 0x01) // ADS1293
                 {
+                    std::cout << "OK" << std::endl;
                     //set the i-th bit to 1 to indicate that the module has the class type
                     modules_mask |= mask;
                     nb_modules++;
-                    EMG_ADS1293 *emg = new EMG_ADS1293(
-                        &device.controller, device.modules[i]->id, verbose);
+                    EMG_ADS1293 *emg =
+                        new EMG_ADS1293(&device.controller, i, verbose);
                     device.modules[i] = emg;
                     emg->setup(route_table, chx_enable, chx_high_res,
                                chx_high_freq, R1, R2, R3);
                 }
+                else
+                    std::cout << "NO" << std::endl;
             }
             mask <<= 1;
         }
@@ -238,6 +242,8 @@ class EMG_ADS1293 : public Module, virtual public ESC::CLI
         {
             if(modules_mask & (((uint32_t)1) << i))
             {
+                std::cout << "[ADS1293_test] start acquisition module " << i
+                          << std::endl;
                 EMG_ADS1293 *emg = EMG_ADS1293::getModule(device, i);
                 emg->set_mode(EMG_ADS1293::START_CONV);
             }
@@ -257,7 +263,7 @@ class EMG_ADS1293 : public Module, virtual public ESC::CLI
     read_all(Device &device, double *sample)
     {
         uint64_t timestamp = 0;
-        uint8_t buffer[9 + 16 * EMG_ADS1293::nb_modules];
+        uint8_t buffer[16 * EMG_ADS1293::nb_modules];
         int n = device.controller.readReg_multi(
             modules_mask, ADS1293_Reg::DATA_STATUS_REG, 16, buffer, &timestamp);
         if(n != 16 * EMG_ADS1293::nb_modules)
@@ -265,6 +271,7 @@ class EMG_ADS1293 : public Module, virtual public ESC::CLI
             std::cerr << "Error reading EMG data" << std::endl;
             return -1;
         }
+        
         for(int i = 0, index = 0; i < device.nb_modules; i++)
             if(modules_mask & (((uint32_t)1) << i))
             {

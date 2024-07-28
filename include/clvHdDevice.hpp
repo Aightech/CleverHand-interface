@@ -8,16 +8,24 @@
 
 namespace ClvHd
 {
-class Device: virtual public ESC::CLI
+class Device : virtual public ESC::CLI
 {
     public:
-    Device(int verbose = -1) : ESC::CLI(verbose, "ClvHd-Device"){};
-    ~Device(){};
-
-    void setup()
+    Device(int verbose = -1) : ESC::CLI(verbose, "ClvHd-Device"), controller(verbose-1) 
     {
-        controller.setup();
-        nb_modules = controller.getNbModules();
+        for(int i = 0; i < CLVHD_NUM_MODULES; i++)
+        {
+            modules[i] = nullptr;
+            module_types[i] = 0;
+        }
+    };
+    ~Device() {};
+
+    uint8_t
+    setup()
+    {
+        nb_modules = controller.setup();
+        return nb_modules;
     };
 
     Module *modules[CLVHD_NUM_MODULES];
@@ -26,7 +34,6 @@ class Device: virtual public ESC::CLI
     Controller controller;
 
     protected:
-
 };
 
 } // namespace ClvHd

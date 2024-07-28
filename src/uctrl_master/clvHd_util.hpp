@@ -1,4 +1,5 @@
 #include <SPI.h>
+#include <Wire.h>
 
 #define READ 0b10000000
 #define WRITE 0b00000000
@@ -9,8 +10,8 @@ class ClvHd
 {
     public:
     // Initialise the SPI bus and the selction pins
-    ClvHd(){};
-    ~ClvHd(){};
+    ClvHd() {};
+    ~ClvHd() {};
 
     void
     begin()
@@ -19,9 +20,13 @@ class ClvHd
         SPI.beginTransaction(SPISettings(20000000, MSBFIRST, SPI_MODE0));
         for(int i = 0; i < 5; i++) pinMode(m_addPins[i], OUTPUT);
         selectBrd(0xff);
-        
+        pinMode(m_availPin, INPUT_PULLUP);
+        pinMode(m_clkPin, OUTPUT); //CLK
+        pinMode(m_outPin, OUTPUT); //pull LOW to stop counting
+        digitalWrite(m_outPin, LOW);
+        digitalWrite(m_clkPin, LOW);
 
-        this->m_nbModule = 1;//initModules();
+        this->m_nbModule = 0;
     };
 
     /**
@@ -32,28 +37,24 @@ class ClvHd
     uint8_t
     initModules()
     {
-        uint8_t nbModule = 0;
-        // set output pin to HIGH, then pulse clock pin. at every pulse, a new module will be initialised if present
-        // if present, the module will pull the data pin low for a short period of time
-        digitalWrite(m_outPin, HIGH);
-        pinMode(m_dataPin, INPUT_PULLDOWN);
-        //loop until no more module is found ( waiting for the data pin to be pulled low for a short period of time)
-        while(1)
+        if(initialized)
+            return this->m_nbModule;
+            
+        int width = 1;
+        //send pulse as long as the m_availPin is pulled high by a unaddressed module
+        while(digitalRead(m_availPin) == 0)
         {
             digitalWrite(m_clkPin, HIGH);
             delayMicroseconds(1);
             digitalWrite(m_clkPin, LOW);
             delayMicroseconds(1);
-            long time = micros();
-            while(digitalRead(m_dataPin) == HIGH)
-            {
-                if(micros() - time > 1000)
-                {
-                    return nbModule;
-                }
-            }
+            this->m_nbModule++;
+            delay(width);
         }
-        return nbModule;
+        //init i2c
+        Wire.begin();
+        initialized = true;
+        return this->m_nbModule;
     }
 
     /**
@@ -120,9 +121,10 @@ class ClvHd
     }
 
     private:
-    const int m_addPins[5] = {6, 7, 8, 9, 10};
+    bool initialized = false;
+    const int m_addPins[5] = {2, 3, 4, 5, 6};
     int m_nbModule = 0;
-    int m_clkPin = 3;
-    int m_dataPin = 5;
-    int m_outPin = 4;
+    int m_availPin = 18;
+    int m_clkPin = 19;
+    int m_outPin = 8;
 };

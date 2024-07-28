@@ -18,7 +18,8 @@ main()
         usleep(500000);
 
         //setup the device (count and find the type of modules attached)
-        device.setup();
+        int n = device.setup();
+        std::cout << "Number of modules found: " << n << std::endl;
 
         //setup the emg modules
         bool chx_enable[3] = {true,   // Enable channel 1
@@ -41,6 +42,7 @@ main()
 
         //start the emg modules
         ClvHd::EMG_ADS1293::start_acquisition(device);
+
 
         std::vector<double> sample(nb_EMG_module * 6);
         for(int t = 0;; t++)
