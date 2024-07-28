@@ -252,6 +252,7 @@ class Controller : public Communication::Serial
 
     operator std::string() const { return "Controller board"; };
 
+
     private:
     uint8_t m_buffer[CLVHD_BUFFER_SIZE];
 };

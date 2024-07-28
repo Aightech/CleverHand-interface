@@ -5,7 +5,7 @@
 #include <stdlib.h>
 
 int
-main()
+main(int argc, char *argv[])
 {
     std::cout << "CleverHand Serial Interface:" << std::endl;
     try

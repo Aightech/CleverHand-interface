@@ -147,16 +147,16 @@ class EMG_ADS1293 : public Module, virtual public ESC::CLI
     get_R3(int ch);
 
     double
-    read_precise_value(int ch);
+    read_precise_value(int ch, bool converted = true);
 
     double
-    read_fast_value(int ch);
+    read_fast_value(int ch, bool converted = true);
 
     double
-    precise_value(int ch);
+    precise_value(int ch, bool converted = true);
 
     double
-    fast_value(int ch);
+    fast_value(int ch, bool converted = true);
 
     double
     conv(uint16_t val);
@@ -172,6 +172,8 @@ class EMG_ADS1293 : public Module, virtual public ESC::CLI
 
     std::string
     error_status_str();
+
+    std::string dump_regs(bool pull = false);
 
     uint8_t *
     get_regs()
@@ -221,8 +223,8 @@ class EMG_ADS1293 : public Module, virtual public ESC::CLI
                     //set the i-th bit to 1 to indicate that the module has the class type
                     modules_mask |= mask;
                     nb_modules++;
-                    EMG_ADS1293 *emg =
-                        new EMG_ADS1293(&device.controller, i, verbose);
+                    EMG_ADS1293 *emg = new EMG_ADS1293(
+                        &device.controller, i, verbose);
                     device.modules[i] = emg;
                     emg->setup(route_table, chx_enable, chx_high_res,
                                chx_high_freq, R1, R2, R3);
