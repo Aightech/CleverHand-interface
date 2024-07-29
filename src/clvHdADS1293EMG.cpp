@@ -1,4 +1,4 @@
-#include <clvHdEMG.hpp>
+#include <clvHdADS1293EMG.hpp>
 
 namespace ClvHd
 {
@@ -6,6 +6,7 @@ using namespace ESC;
 
 uint32_t EMG_ADS1293::modules_mask = 0;
 uint8_t EMG_ADS1293::nb_modules = 0;
+ESC::CLI EMG_ADS1293::s_cli = ESC::CLI(-1, "EMG_ADS1293");
 
 EMG_ADS1293::EMG_ADS1293(Controller *controller, int id, int verbose)
     : 

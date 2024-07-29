@@ -301,6 +301,9 @@ class EMG_ADS1293 : public Module, virtual public ESC::CLI
     Mode m_mode;
     uint8_t m_regs[0x50];
 
+    //ESC::CLI for static functions
+    static ESC::CLI s_cli;
+
     int32_t *m_precise_value[3];
     int32_t m_fast_adc_max;
     int32_t m_precise_adc_max[3];
