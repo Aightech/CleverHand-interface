@@ -43,7 +43,7 @@ loop()
                 {
                     //read n bytes starting from reg address of the module i
                     //and store them in vals_buff (send_buff + 9)
-                    clvHd.readRegister(reg, vals_buff + n * ir, n, i);
+                    clvHd.readRegister(reg, vals_buff + n * ir, n, i+1);
                     ir++;
                 }
             }
