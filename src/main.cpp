@@ -18,18 +18,18 @@ main(int argc, char *argv[])
         usleep(500000);
 
         //setup the device (count and find the type of modules attached)
-        device.setup();
+        int n = device.setup();
 
         //setup the emg modules
         bool chx_enable[3] = {true,   // Enable channel 1
                               false,  // Disable channel 2
                               false}; // Disable channel 3
         int route_table[3][2] = {
-            {0, 1},  // (-) and (+) electrodes of the first channel
+            {1, 2},  // (-) and (+) electrodes of the first channel
             {0, 1},  // (-) and (+) electrodes of the second channel
             {0, 1}}; // (-) and (+) electrodes of the third channel
         bool chx_high_res[3] = {
-            true, true, true}; // Enable or disable the high resolution mode
+            false, true, true}; // Enable or disable the high resolution mode
         bool chx_high_freq[3] = {
             true, true, true}; // Enable or disable the high frequency mode
         int R1[3] = {4, 4, 4}; // Gain R1 of the INA channels
@@ -39,8 +39,11 @@ main(int argc, char *argv[])
         int nb_EMG_module = ClvHd::EMG_ADS1293::setup(device, chx_enable, route_table, chx_high_res,
                                   chx_high_freq, R1, R2, R3);
 
+        //return 0;
+
         //start the emg modules
         ClvHd::EMG_ADS1293::start_acquisition(device);
+
 
         std::vector<double> sample(nb_EMG_module * 6);
         for(int t = 0;; t++)
@@ -52,7 +55,7 @@ main(int argc, char *argv[])
                 std::cout << std::fixed << std::setprecision(2) << sample[i]
                           << " ";
             std::cout << std::endl;
-            usleep(1000);
+            usleep(100000);
         }
     }
     catch(std::exception &e)

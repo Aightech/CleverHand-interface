@@ -1,21 +1,127 @@
 # CleverHand-library
 This is the CleverHand library, a library for the CleverHand interface.
 
-## Compatibility
-The library is compatible with
-- :heavy_check_mark: Linux
-- :hammer: Windows (test in progress)
-- :hourglass_flowing_sand: MacOS (not tested)
 
-## Available Modules
-- :hammer: EMG_ADS1293
-- :hourglass_flowing_sand: EMG_ADS1298
-- :hourglass_flowing_sand: IMU_BNO055
+## Serial protocol
+Each request from the computer to the controller is a 8 bytes long frame. The first byte is always the command, the rest of the bytes depend on the command. 
+
+### Read 'r' request
+Request to read a register from a module attached to the controller. 
+1. 'r': read commad
+2. id : A 32-bits mask indicating which module to address. **Note**: 0b0110 address module 1 and 2
+3. n  : number of bytes to read
+4. nc: number of bytes of the command
+5. cmd: read command to be sent to the module
 
 
+**Note**: The number of bytes replyed by the controller `len` is equal to `n`*N with N the number of modules addressed by the id mask.
 
-## Serial Interface
-The protocol used to communicate with the CleverHand controller is a simple serial protocol. Each request from the computer to the controller is described in [PROTOCOL.md](docs/PROTOCOL.md).
+<img src="https://svg.wavedrom.com/{signal:[{name:'Tx',wave:'x==|===.|xxxxxxx',data:['r','id','n','nc','cmd']},{name:'Rx',wave:'xxxxxxxxx=|==.|x',data:['ts','len','val']},{node:'..E.F.G..A.BC..D'}],head:{text:'Read command'},edge:['A+B 8bytes','C+D len bytes','E+F 4 bytes','G+A nc bytes']}"/>
+
+```wavedrom
+{ signal: [
+  { name: 'Tx', wave: 'x==|===.|xxxxxxx', data: ['r', 'id', 'n', 'nc', 'cmd'] },
+  { name: 'Rx', wave: 'xxxxxxxxx=|==.|x', data: ['ts', 'len', 'val']},
+  {                              node: '..E.F.G..A.BC..D'}
+],
+    head: { text: 'Read command' },
+    edge: [ 'A+B 8bytes', 'C+D len bytes' , 'E+F 4 bytes', 'G+A nc bytes']
+}
+```
+
+### Write 'w' request
+Request to write a register from a module attached to the controller. There is no response to this command.
+1. 'w': write command
+2. id : A 32-bits mask indicating which module to address. **Note**: 0b0110 address module 1 and 2
+3. n  : number of bytes to write
+4. nc: number of bytes of the command
+5. cmd: write command to be sent to the module
+6. val: value to write
+
+
+<img src="https://svg.wavedrom.com/{signal:[{name:'Tx',wave:'x==|====.|=|x',data:['w','id','reg','n','nc','cmd','val']},{node:'..A.B..E..C.D'}],head:{text:'Write command'},edge:['A+B 4 bytes','C+D n bytes','E+C nc bytes']}"/>
+
+
+```wavedrom
+{ signal: [
+  { name: 'Tx', wave: 'x==|====.|=|x', data: ['w', 'id', 'reg', 'n', 'nc', 'cmd','val'] },
+  {                              node: '..A.B..E..C.D'}
+],
+    head: { text: 'Write command' },
+    edge: [ 'A+B 4 bytes', 'C+D n bytes', 'E+C nc bytes']
+}
+```
+
+### Setup 's' request
+Request to setup the controller. Expected response is the number of modules attached to the controller.
+1. 's': setup command
+
+<img src="https://svg.wavedrom.com/{signal:[{name:'Tx',wave:'x=xxxxx',data:['s']},{name:'Rx',wave:'xx=|==x',data:['ts','1','nb']},{node:'..A.B'}],head:{text:'Setup command'},edge:['A+B 8bytes']}"/>
+
+```wavedrom
+{ signal: [
+  { name: 'Tx', wave: 'x=xxxxx', data: ['s'] },
+  { name: 'Rx', wave: 'xx=|==x', data: ['ts', '1', 'nb']},
+  {                              node: '..A.B'}
+],
+    head: { text: 'Setup command' },
+    edge: [ 'A+B 8bytes' ]
+}
+```
+
+### Number of modules 'n' request
+Request to know the number of modules attached to the controller.
+1. 'n': number of modules command
+
+<img src="https://svg.wavedrom.com/{signal:[{name:'Tx',wave:'x=xxxxx',data:['n']},{name:'Rx',wave:'xx=|==x',data:['ts','1','nb']},{node:'..A.B'}],head:{text:'Number of modules command'},edge:['A+B 8bytes']}"/>
+
+```wavedrom
+{ signal: [
+  { name: 'Tx', wave: 'x=xxxxx', data: ['n'] },
+  { name: 'Rx', wave: 'xx=|==x', data: ['ts', '1', 'nb']},
+  {                              node: '..A.B'}
+],
+    head: { text: 'Number of modules command' },
+    edge: [ 'A+B 8bytes' ]
+}
+```
+
+### Mirror 'm' request
+Request to test the communication with the controller. The expected response is the same frame sent by the computer.
+1. 'm': mirror command
+2. v1 : value 1
+3. v2 : value 2
+4. v3 : value 3
+
+<img src="https://svg.wavedrom.com/{signal:[{name:'Tx',wave:'x====xxxxxxx',data:['m','v1','v2','v3']},{name:'Rx',wave:'xxxxx=|====x',data:['ts','3','v1','v2','v3']},{node:'.....A.B.C.D'}],head:{text:'Mirror command'},edge:['A+B 8bytes']}"/>
+
+```wavedrom
+{ signal: [
+  { name: 'Tx', wave: 'x====xxxxxxx', data: ['m', 'v1', 'v2', 'v3'] },
+  { name: 'Rx', wave: 'xxxxx=|====x', data: ['ts', '3', 'v1', 'v2', 'v3']},
+  {                              node: '.....A.B.C.D'}
+],
+    head: { text: 'Mirror command' },
+    edge: [ 'A+B 8bytes' ]
+}
+```
+
+### Version 'v' request
+Request to know the version of the controller.
+1. 'v': version command
+
+<img src="https://svg.wavedrom.com/{signal:[{name:'Tx',wave:'x=xxxxxx',data:['v']},{name:'Rx',wave:'xx=|===x',data:['ts','2','V.M','V.m']},{node:'..A.BCDE'}],head:{text:'Version command'},edge:['A+B 8bytes','C+D Major','D+E Minor']}"/>
+
+```wavedrom
+{ signal: [
+  { name: 'Tx', wave: 'x=xxxxxx', data: ['v'] },
+  { name: 'Rx', wave: 'xx=|===x', data: ['ts', '2', 'V.M', 'V.m']},
+  {                              node: '..A.BCDE'}
+],
+    head: { text: 'Version command' },
+    edge: [ 'A+B 8bytes', 'C+D Major', 'D+E Minor' ]
+}
+```
 
 ## Cpp library
 The library is written in C++ and is composed of a namespace `ClvHd`, a class `Device` , a class `Controller` and a class abstract class `Module`.

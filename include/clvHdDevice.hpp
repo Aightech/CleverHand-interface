@@ -11,19 +11,21 @@ namespace ClvHd
 class Device : virtual public ESC::CLI
 {
     public:
-    Device(int verbose = -1)
-        : ESC::CLI(verbose, "ClvHd-Device"), controller(verbose - 1)
+    Device(int verbose = -1) : ESC::CLI(verbose, "ClvHd-Device"), controller(verbose-1) 
     {
-        for(int i = 0; i < CLVHD_NUM_MODULES; i++) modules[i] = nullptr;
+        for(int i = 0; i < CLVHD_NUM_MODULES; i++)
+        {
+            modules[i] = nullptr;
+            module_types[i] = 0;
+        }
     };
+    ~Device() {};
 
-    ~Device(){};
-
-    void
+    uint8_t
     setup()
     {
-        logln("setup");
         nb_modules = controller.setup();
+        return nb_modules;
     };
 
     Module *modules[CLVHD_NUM_MODULES];
