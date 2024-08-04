@@ -14,6 +14,7 @@ EMG_ADS1293::EMG_ADS1293(Controller *controller, int id, int verbose)
 {
     this->id = id;
     this->m_controller = controller;
+    this->m_type = "EMG_ADS1293";
     logln("Initialised", true);
     for(int i = 0; i < 0x50; i++) m_regs[i] = 0x00;
 
@@ -42,7 +43,7 @@ EMG_ADS1293::EMG_ADS1293(Controller *controller, int id, int verbose)
         m_fast_value[0] = 0xabcd;
 };
 
-EMG_ADS1293::~EMG_ADS1293() { m_controller->writeReg(this->id, CONFIG_REG, 0x02); }
+EMG_ADS1293::~EMG_ADS1293() { this->writeReg( CONFIG_REG, 0x02); }
 
 int
 EMG_ADS1293::setup(int route_table[3][2],
@@ -59,7 +60,7 @@ EMG_ADS1293::setup(int route_table[3][2],
                           : EXTERN; //Start clk and output on CLK pin (0x05);
 
     // standby mode (0x02)
-    int n = this->set_mode(STANDBY);
+    int n = this->set_mode(POWER_DOWN);
     n += this->config_clock(true, clk_src, true);
     n += this->route_channel(0, route_table[0][0], route_table[0][1]);
     n += this->route_channel(1, route_table[1][0], route_table[1][1]);
@@ -74,6 +75,7 @@ EMG_ADS1293::setup(int route_table[3][2],
     n += this->config_R3(0, R3[0]);
     n += this->config_R3(1, R3[1]);
     n += this->config_R3(2, R3[2]);
+    logln("Seting n=" + std::to_string(n), true);
 
     bool ret = is_clock_ext();
     logln("Seting ", true);
@@ -82,7 +84,7 @@ EMG_ADS1293::setup(int route_table[3][2],
 
     int range[3] = {0, 1, 2};
 
-    logln("Seting up ADS1293 : " + ((n == 26) ? fstr(" OK", {BOLD, FG_GREEN})
+    logln("Seting up ADS1293 : " + ((n == 13) ? fstr(" OK", {BOLD, FG_GREEN})
                                               : fstr(" ERROR", {BOLD, FG_RED})),
           true);
     logln("Set clock on CLK " + clk_src_s);
@@ -96,7 +98,7 @@ EMG_ADS1293::setup(int route_table[3][2],
     log("Route      |", true);
     for(int i : {0, 1, 2})
         log("(-)" + std::to_string(get_route_neg(i)) + " (+)" +
-            std::to_string(get_route_neg(i)) + "|");
+            std::to_string(get_route_pos(i)) + "|");
     logln("");
 
     logln("Resolution |  " +
@@ -143,14 +145,16 @@ EMG_ADS1293::route_channel(uint8_t channel, uint8_t pos_in, uint8_t neg_in)
     if(pos_in==neg_in)
         val|=0xc0;
     m_regs[FLEX_CH0_CN_REG + channel] = val;
-    return m_controller->writeReg(this->id, FLEX_CH0_CN_REG + channel, val);
+    logln("route_channel " + std::to_string(channel) + " " + std::to_string(pos_in) + " " + std::to_string(neg_in) + " " + std::to_string(val), true);
+    std::cout << std::hex << (int)val << std::dec << std::endl;
+    return this->writeReg( FLEX_CH0_CN_REG + channel, val);
 }
 
 int
 EMG_ADS1293::get_route_neg(int ch)
 {
     uint8_t val = 0;
-    m_controller->readReg(this->id, FLEX_CH0_CN_REG + ch, 1, &val);
+    this->readReg( FLEX_CH0_CN_REG + ch, 1, &val);
     return ((val & 0b111000) >> 3);
 }
 
@@ -158,7 +162,7 @@ int
 EMG_ADS1293::get_route_pos(int ch)
 {
     uint8_t val = 0;
-    m_controller->readReg(this->id, FLEX_CH0_CN_REG + ch, 1, &val);
+    this->readReg( FLEX_CH0_CN_REG + ch, 1, &val);
     return (val & 0b111);
 }
 
@@ -167,14 +171,14 @@ EMG_ADS1293::set_mode(Mode mode)
 {
     m_mode = mode;
     m_regs[CONFIG_REG] = mode;
-    return m_controller->writeReg(this->id, CONFIG_REG, mode);
+    return this->writeReg( CONFIG_REG, mode);
 }
 
 EMG_ADS1293::Mode
 EMG_ADS1293::get_mode()
 {
     uint8_t val = 0;
-    m_controller->readReg(this->id, CONFIG_REG, 1, &val);
+    this->readReg( CONFIG_REG, 1, &val);
     return (Mode)(val);
 }
 
@@ -183,14 +187,14 @@ EMG_ADS1293::config_clock(bool start, CLK_SRC src, bool en_output)
 {
     uint8_t val = (start ? 0x4 : 0x0) | (src << 1) | (en_output ? 0x1 : 0x0);
     m_regs[OSC_CN_REG] = val;
-    return m_controller->writeReg(this->id, OSC_CN_REG, val);
+    return this->writeReg( OSC_CN_REG, val);
 }
 
 bool
 EMG_ADS1293::is_clock_started()
 {
     uint8_t val = 0;
-    m_controller->readReg(this->id, OSC_CN_REG, 1, &val);
+    this->readReg( OSC_CN_REG, 1, &val);
     return (val >> 2) & 0b1;
 }
 
@@ -198,7 +202,7 @@ bool
 EMG_ADS1293::is_clock_ext()
 {
     uint8_t val = 0;
-    m_controller->readReg(this->id, OSC_CN_REG, 1, &val);
+    this->readReg( OSC_CN_REG, 1, &val);
     bool ret = (val >> 1) & 0b1;
     //logln("is_clock_ext: " + std::to_string(ret));
     return ret;
@@ -208,7 +212,7 @@ bool
 EMG_ADS1293::is_clock_output_enabled()
 {
     uint8_t val = 0;
-    m_controller->readReg(this->id, OSC_CN_REG, 1, &val);
+    this->readReg( OSC_CN_REG, 1, &val);
     return (val & 0b1);
 }
 
@@ -218,14 +222,14 @@ EMG_ADS1293::enable_ADC(bool ch0, bool ch1, bool ch2)
     uint8_t val =
         (ch0 ? 0 : 0b001001) | (ch1 ? 0 : 0b010010) | (ch2 ? 0 : 0b100100);
     m_regs[AFE_SHDN_CN_REG] = val;
-    return m_controller->writeReg(this->id, AFE_SHDN_CN_REG, val);
+    return this->writeReg(AFE_SHDN_CN_REG, val);
 }
 
 bool
 EMG_ADS1293::is_ADC_enabled(int ch)
 {
     uint8_t val = 0;
-    m_controller->readReg(this->id, AFE_SHDN_CN_REG, 1, &val);
+    this->readReg( AFE_SHDN_CN_REG, 1, &val);
     uint8_t mask = 0b001001;
     return !(val & (mask << ch));
 }
@@ -236,14 +240,14 @@ EMG_ADS1293::enable_SDM(bool ch0, bool ch1, bool ch2)
     uint8_t val = (m_regs[AFE_SHDN_CN_REG] & 0b111) | (ch0 ? 0 : 0b1000) |
                   (ch1 ? 0 : 0b10000) | (ch2 ? 0 : 0b100000);
     m_regs[AFE_SHDN_CN_REG] = val;
-    return m_controller->writeReg(this->id, AFE_SHDN_CN_REG, val);
+    return this->writeReg( AFE_SHDN_CN_REG, val);
 }
 
 bool
 EMG_ADS1293::is_SDM_enabled(int ch)
 {
     uint8_t val = 0;
-    m_controller->readReg(this->id, AFE_SHDN_CN_REG, 1, &val);
+    this->readReg( AFE_SHDN_CN_REG, 1, &val);
     return !((val >> (3 + ch)) & 0b1);
 }
 
@@ -253,14 +257,14 @@ EMG_ADS1293::enable_INA(bool ch0, bool ch1, bool ch2)
     uint8_t val = (m_regs[AFE_SHDN_CN_REG] & 0b111000) | (ch0 ? 0 : 0b1) |
                   (ch1 ? 0 : 0b10) | (ch2 ? 0 : 0b100);
     m_regs[AFE_SHDN_CN_REG] = val;
-    return m_controller->writeReg(this->id, AFE_SHDN_CN_REG, val);
+    return this->writeReg( AFE_SHDN_CN_REG, val);
 }
 
 bool
 EMG_ADS1293::is_INA_enabled(int ch)
 {
     uint8_t val = 0;
-    m_controller->readReg(this->id, AFE_SHDN_CN_REG, 1, &val);
+    this->readReg( AFE_SHDN_CN_REG, 1, &val);
     return !((val >> (ch)) & 0b1);
 }
 
@@ -271,14 +275,14 @@ EMG_ADS1293::config_resolution(bool ch0_high_res, bool ch1_high_res, bool ch2_hi
                   (ch0_high_res ? 0b1 : 0) | (ch2_high_res ? 0b010 : 0) |
                   (ch2_high_res ? 0b100 : 0);
     m_regs[AFE_RES_REG] = val;
-    return m_controller->writeReg(this->id, AFE_RES_REG, val);
+    return this->writeReg( AFE_RES_REG, val);
 }
 
 bool
 EMG_ADS1293::is_high_res_enabled(int ch)
 {
     uint8_t val = 0;
-    m_controller->readReg(this->id, AFE_RES_REG, 1, &val);
+    this->readReg( AFE_RES_REG, 1, &val);
     return ((val >> (ch)) & 0b1);
 }
 
@@ -291,14 +295,14 @@ EMG_ADS1293::config_frequence(bool ch0_freq_double,
         (m_regs[AFE_RES_REG] & 0b111) | (ch0_freq_double ? 0b1000 : 0) |
         (ch1_freq_double ? 0b010000 : 0) | (ch2_freq_double ? 0b100000 : 0);
     m_regs[AFE_RES_REG] = val;
-    return m_controller->writeReg(this->id, AFE_RES_REG, val);
+    return this->writeReg( AFE_RES_REG, val);
 }
 
 bool
 EMG_ADS1293::is_high_freq_enabled(int ch)
 {
     uint8_t val = 0;
-    m_controller->readReg(this->id, AFE_RES_REG, 1, &val);
+    this->readReg( AFE_RES_REG, 1, &val);
     return ((val >> (ch + 3)) & 0b1);
 }
 
@@ -310,14 +314,14 @@ EMG_ADS1293::config_R1(uint8_t R1_ch0, uint8_t R1_ch1, uint8_t R1_ch2)
     R1_ch2 = (R1_ch2 < 3) ? 0b100 : 0; //2 or 4
     uint8_t val = R1_ch0 | R1_ch1 | R1_ch2;
     m_regs[R1_RATE_REG] = val;
-    return m_controller->writeReg(this->id, R1_RATE_REG, val);
+    return this->writeReg( R1_RATE_REG, val);
 }
 
 int
 EMG_ADS1293::get_R1(int ch)
 {
     uint8_t val = 0;
-    m_controller->readReg(this->id, R1_RATE_REG, 1, &val);
+    this->readReg( R1_RATE_REG, 1, &val);
     return ((val >> ch) & 0b1) ? 2 : 4;
 }
 
@@ -357,14 +361,14 @@ EMG_ADS1293::config_R2(uint8_t R2)
             m_precise_adc_max[i] = R3_val ? 0x800000 : 0xF30000;
     }
     m_regs[R2_RATE_REG] = R2;
-    return m_controller->writeReg(this->id, R2_RATE_REG, R2);
+    return this->writeReg( R2_RATE_REG, R2);
 }
 
 int
 EMG_ADS1293::get_R2(int ch)
 {
     uint8_t val = 0;
-    m_controller->readReg(this->id, R2_RATE_REG, 1, &val);
+    this->readReg( R2_RATE_REG, 1, &val);
     switch(val & 0b1111)
     {
     case 0b0001:
@@ -410,14 +414,14 @@ EMG_ADS1293::config_R3(int ch, uint8_t R3)
         m_precise_adc_max[ch] = R3_val ? 0x800000 : 0xF30000;
 
     m_regs[R3_RATE_CH0_REG + ch] = R3;
-    return m_controller->writeReg(this->id, R3_RATE_CH0_REG + ch, R3);
+    return this->writeReg( R3_RATE_CH0_REG + ch, R3);
 }
 
 int
 EMG_ADS1293::get_R3(int ch)
 {
     uint8_t val = 0;
-    m_controller->readReg(this->id, R3_RATE_CH0_REG + ch, 1, &val);
+    this->readReg(R3_RATE_CH0_REG + ch, 1, &val);
     switch(val)
     {
     case 0b00000001:
@@ -462,8 +466,8 @@ EMG_ADS1293::fast_value(int ch, bool converted)
 double
 EMG_ADS1293::read_fast_value(int ch, bool converted)
 {
-    m_controller->readReg(this->id, DATA_CH0_PACE_REG + 2 * ch, 2,
-                      &(m_fast_value[ch]));
+    this->readReg(DATA_CH0_PACE_REG + 2 * ch, 2,
+                      (uint8_t*)&(m_fast_value[ch]));
     if(converted)
         return conv(m_fast_value[ch]);
     else
@@ -473,8 +477,8 @@ EMG_ADS1293::read_fast_value(int ch, bool converted)
 double
 EMG_ADS1293::read_precise_value(int ch, bool converted)
 {
-    m_controller->readReg(this->id, DATA_CH0_ECG_REG + 3 * ch, 3,
-                      m_precise_value[ch]);
+    this->readReg(DATA_CH0_ECG_REG + 3 * ch, 3,
+                      (uint8_t*)m_precise_value[ch]);
     //logln("read_precise_value, n=" + std::to_string(n) + " reg=" + std::to_string(m_regs[DATA_CH0_ECG_REG + 3 * ch]) + " " + std::to_string(m_regs[DATA_CH0_ECG_REG + 3 * ch + 1]) + " " + std::to_string(m_regs[DATA_CH0_ECG_REG + 3 * ch + 2]), true);
     if(converted)
         return conv(ch, *m_precise_value[ch]);
@@ -530,7 +534,7 @@ EMG_ADS1293::conv(int ch, int32_t val)
 int
 EMG_ADS1293::get_error()
 {
-    return m_controller->readReg(this->id, ERROR_LOD_REG, 7,
+    return this->readReg( ERROR_LOD_REG, 7,
                              &m_regs[ERROR_LOD_REG]);
     //return (Error *)&(m_regs[ERROR_LOD_REG]);
 }

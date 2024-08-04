@@ -39,7 +39,7 @@ class ClvHd
     {
         if(initialized)
             return this->m_nbModule;
-            
+
         int width = 1;
         //send pulse as long as the m_availPin is pulled high by a unaddressed module
         while(digitalRead(m_availPin) == 0)
@@ -70,48 +70,41 @@ class ClvHd
     }
 
     /**
-     * @brief Read n bytes starting from the reg address of the module coreponding to id.
+     * @brief Read n uint8_ts starting from the reg address of the module coreponding to id.
      *
-     * @param reg Register address to read from
-     * @param val Buffer to store the read values
-     * @param n Number of bytes to read
+     * @param n_cmd Number of uint8_ts to read from the module
+     * @param cmd Array of uint8_ts to send to the module
+     * @param val Array of uint8_ts to store the read values
+     * @param n Number of uint8_ts to read from the module
      * @param id Address of the module to read from (0 to 32)
-     * @param order Order of the bytes in the buffer (true for MSB first, false for LSB first)
      */
     void
-    readRegister(byte reg,
-                 byte val[],
-                 unsigned n = 1,
-                 uint8_t id = 15,
-                 bool order = true)
+    readCmd(
+        uint8_t n_cmd, uint8_t cmd[], uint8_t n, uint8_t val[], uint8_t id = 15)
     {
-        byte dataToSend = READ | (REG_MASK & reg);
-
         selectBrd(id);
-        SPI.transfer(dataToSend);
-        if(order)
-            for(unsigned i = 0; i < n; i++) *(val + i) = SPI.transfer(0x00);
-        else
-            for(unsigned i = n - 1; i >= 0; i--)
-                *(val + i) = SPI.transfer(0x00);
-        selectBrd(0xff);
+        for(unsigned i = 0; i < n_cmd; i++) SPI.transfer(cmd[i]);
+        for(unsigned i = 0; i < n; i++) *(val + i) = SPI.transfer(0x00);
+        selectBrd(0x00);
     }
 
     /**
-     * @brief Write 1 byte to the reg address of the module coreponding to id.
+     * @brief Write n uint8_t to the reg ad the module coreponding to id.
      *
-     * @param reg Register address to write to
-     * @param val Value to write
+     * @param n_cmd Number of uint8_ts to write to the module
+     * @param cmd Array of uint8_ts to send to the module
+     * @param n Number of uint8_ts to write to the module
+     * @param val Array of uint8_ts to write to the module
      * @param id Address of the module to write to (0 to 32)
      */
     void
-    writeRegister(byte reg, byte val, uint8_t id = 15)
+    writeCmd(
+        uint8_t n_cmd, uint8_t cmd[], uint8_t n, uint8_t val[], uint8_t id = 15)
     {
-        byte dataToSend = WRITE | (REG_MASK & reg);
         selectBrd(id);
-        SPI.transfer(dataToSend);
-        SPI.transfer(val);
-        selectBrd(0xff);
+        for(unsigned i = 0; i < n_cmd; i++) SPI.transfer(cmd[i]);
+        for(unsigned i = 0; i < n; i++) SPI.transfer(val[i]);
+        selectBrd(0x00);
     }
 
     uint8_t

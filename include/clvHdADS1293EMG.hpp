@@ -1,5 +1,5 @@
-#ifndef CLV_HD_EMG_H
-#define CLV_HD_EMG_H
+#ifndef CLV_HD_ADS1293EMG_H
+#define CLV_HD_ADS1293EMG_H
 
 #include <cmath>
 #include <cstring>
@@ -56,6 +56,33 @@ class EMG_ADS1293 : public Module, virtual public ESC::CLI
     public:
     EMG_ADS1293(Controller *controller, int id, int verbose = -1);
     ~EMG_ADS1293();
+
+    uint8_t
+    readReg(uint8_t reg)
+    {
+        uint8_t val;
+        readReg(reg, 1, &val);
+        return val;
+    }
+    int
+    readReg(uint8_t reg, int n, uint8_t *val)
+    {
+        uint8_t cmd =
+            reg | 0b10000000; //set the MSB to 1 to indicate a read operation
+        return m_controller->readCmd(this->id, 1, &cmd, n, val);
+    }
+    int
+    writeReg(uint8_t reg, uint8_t val)
+    {
+        return writeReg(reg, 1, &val);
+    }
+    int
+    writeReg(uint8_t reg, int n, uint8_t *val)
+    {
+        uint8_t cmd =
+            reg & 0b01111111; //set the MSB to 0 to indicate a write operation
+        return m_controller->writeCmd(this->id, 1, &cmd, n, val);
+    }
 
     /**
      * @brief setup Write all setup parameters to the board.
@@ -173,7 +200,8 @@ class EMG_ADS1293 : public Module, virtual public ESC::CLI
     std::string
     error_status_str();
 
-    std::string dump_regs(bool pull = false);
+    std::string
+    dump_regs(bool pull = false);
 
     uint8_t *
     get_regs()
@@ -203,34 +231,41 @@ class EMG_ADS1293 : public Module, virtual public ESC::CLI
           bool chx_high_freq[3] = nullptr,
           int R1[3] = nullptr,
           int R2 = -1,
-          int R3[3] = nullptr,
-          int verbose = -1)
+          int R3[3] = nullptr)
     {
         uint32_t mask = 1;
         modules_mask = 0; //reset the mask
+        int verbose = device.controller.get_verbose();
+        s_cli.set_verbose(verbose);
         //for each module read the registers REG_ID
+        s_cli.logln("Scanning the " + std::to_string(device.nb_modules) +
+                        " modules: ",
+                    true);
         for(int i = 0; i < device.nb_modules; i++)
         {
-            std::cout << "[ADS1293_test] module " << i << ": ";
+            // std::cout << "[ADS1293_test] module " << i << ": ";
+            s_cli.log("module " + std::to_string(i) + ": ", true);
             if(device.modules[i] == nullptr)
             {
                 uint8_t rev_id = 0;
-                device.controller.readReg(i, ADS1293_Reg::REVID_REG, 1,
-                                          &rev_id);
+                uint8_t cmd = ADS1293_Reg::REVID_REG | 0b10000000;
+                device.controller.readCmd(i, 1, &cmd, 1, &rev_id);
                 if(rev_id == 0x01) // ADS1293
                 {
-                    std::cout << "OK" << std::endl;
+                    s_cli.log(ESC::fstr("OK\n", {ESC::FG_GREEN, ESC::BOLD}));
                     //set the i-th bit to 1 to indicate that the module has the class type
                     modules_mask |= mask;
                     nb_modules++;
-                    EMG_ADS1293 *emg = new EMG_ADS1293(
-                        &device.controller, i, verbose);
+                    EMG_ADS1293 *emg =
+                        new EMG_ADS1293(&device.controller, i, verbose);
                     device.modules[i] = emg;
                     emg->setup(route_table, chx_enable, chx_high_res,
                                chx_high_freq, R1, R2, R3);
                 }
                 else
-                    std::cout << "NO" << std::endl;
+                {
+                    s_cli.log(ESC::fstr("NO\n", {ESC::FG_RED, ESC::BOLD}));
+                }
             }
             mask <<= 1;
         }
@@ -244,10 +279,13 @@ class EMG_ADS1293 : public Module, virtual public ESC::CLI
         {
             if(modules_mask & (((uint32_t)1) << i))
             {
-                std::cout << "[ADS1293_test] start acquisition module " << i
-                          << std::endl;
+                // std::cout << "[ADS1293_test] start acquisition module " << i
+                //           << std::endl;
+                s_cli.logln("start acquisition module " + std::to_string(i),
+                          true);
                 EMG_ADS1293 *emg = EMG_ADS1293::getModule(device, i);
                 emg->set_mode(EMG_ADS1293::START_CONV);
+                s_cli.logln("mode: " + std::to_string(emg->get_mode()), true);
             }
         }
     };
@@ -266,14 +304,16 @@ class EMG_ADS1293 : public Module, virtual public ESC::CLI
     {
         uint64_t timestamp = 0;
         uint8_t buffer[16 * EMG_ADS1293::nb_modules];
-        int n = device.controller.readReg_multi(
-            modules_mask, ADS1293_Reg::DATA_STATUS_REG, 16, buffer, &timestamp);
+
+        uint8_t cmd = ADS1293_Reg::DATA_STATUS_REG | 0b10000000;
+        int n = device.controller.readCmd_multi(
+            modules_mask, 1, &cmd, 16, buffer, &timestamp);
         if(n != 16 * EMG_ADS1293::nb_modules)
         {
             std::cerr << "Error reading EMG data" << std::endl;
             return -1;
         }
-        
+
         for(int i = 0, index = 0; i < device.nb_modules; i++)
             if(modules_mask & (((uint32_t)1) << i))
             {
@@ -291,6 +331,7 @@ class EMG_ADS1293 : public Module, virtual public ESC::CLI
                 index++;
             }
         return timestamp;
+        return 0;
     };
 
     // each bit represent if the module has the class type
