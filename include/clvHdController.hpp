@@ -200,6 +200,12 @@ class Controller : public Communication::Serial
             return 0;
     };
 
+    void setRGB(uint8_t id_module, uint8_t id_led, uint8_t r, uint8_t g, uint8_t b)
+    {
+        uint8_t msg[6]={'i', id_module, id_led, r, g, b};
+        sendCmd(msg, 6);
+    };
+
     /**
      * @brief Get the number of modules connected to the controller board.
      * @return The number of modules connected to the controller board.
