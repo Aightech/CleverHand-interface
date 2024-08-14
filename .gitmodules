@@ -1,11 +1,11 @@
 [submodule "tool_lib/built_lsl"]
 	path = tool_lib/built_lsl
-	url = git@github.com:Aightech/built_lsl.git
+	url = ../built_lsl.git
 	branch = main
 [submodule "lib/com_client"]
 	path = lib/com_client
-	url = git@github.com:Aightech/com_client.git
+	url = ../com_client.git
 [submodule "lib/strANSIseq"]
 	path = lib/strANSIseq
-	url = git@github.com:Aightech/strANSIseq
+	url = ../strANSIseq
 	branch = main
