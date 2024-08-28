@@ -1,6 +1,16 @@
 #!/usr/bin/env python
 import pyclvhd
 import time
+import sys
+
+duration = 5  # duration of the recording in seconds
+if len(sys.argv) > 1:
+    try:
+        duration = int(sys.argv[1])
+    except:
+        print("Invalid duration")
+        print("Usage: python 03_recording.py [duration]")    
+print(f"Recording duration: {duration}s")
 
 verbosity = 3  # amount of information to print in the console (0: no information)
 path_dev = "/dev/ttyACM0"  # path to the serial port
@@ -30,15 +40,25 @@ clvhd.setupADS1293(route_table, chx_enable, chx_high_res, chx_high_freq, R1, R2,
 # Start the acquisition
 clvhd.start_acquisition()
 
+# open a file "data.csv" in write mode
+f = open("data.txt", "w")
+
 # run for 10s
 t0 = time.time()
-while time.time() - t0 < 10:
-    ts, fast_list, precise_list = clvhd.read_all()  #
-    print("timestamp (us): ", ts)
-    print(
-        "fast readings: ", fast_list
-    )  # list of list (nb_modules x 3) of the fast readings (nan for the readings that are not enabled or not ready)
-    print(
-        "precise readings: ", precise_list
-    )  # list of list (nb_modules x 3) of the precise readings (nan for the readings that are not enabled or not ready)
-    time.sleep(0.001)
+printed_ts = 0
+while time.time() - t0 < duration:
+    ts, fast_list, precise_list = clvhd.read_all()  #read all the data from the device
+    s = str(ts) + ", " 
+    for i in range(nb):
+        for j in range(3):
+            s += str(fast_list[i][j]) + ", "
+    for i in range(nb):
+        for j in range(3):
+            s += str(precise_list[i][j]) + ", "
+    s = s[:-2] + "\n"
+    f.write(s)  #write the data to the file
+    if time.time() - printed_ts > 1:
+        print(int(time.time()-t0)+1, "/", duration, "s")
+        printed_ts = time.time()
+
+f.close()  #close the file
