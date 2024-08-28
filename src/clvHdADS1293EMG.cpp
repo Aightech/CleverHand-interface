@@ -9,8 +9,7 @@ uint8_t EMG_ADS1293::nb_modules = 0;
 ESC::CLI EMG_ADS1293::s_cli = ESC::CLI(-1, "EMG_ADS1293");
 
 EMG_ADS1293::EMG_ADS1293(Controller *controller, int id, int verbose)
-    : 
-      ESC::CLI(verbose, "EMG_" + std::to_string(id))
+    : ESC::CLI(verbose, "EMG_" + std::to_string(id))
 {
     this->id = id;
     this->m_controller = controller;
@@ -43,17 +42,17 @@ EMG_ADS1293::EMG_ADS1293(Controller *controller, int id, int verbose)
         m_fast_value[0] = 0xabcd;
 };
 
-EMG_ADS1293::~EMG_ADS1293() { this->writeReg( CONFIG_REG, 0x02); }
+EMG_ADS1293::~EMG_ADS1293() { this->writeReg(CONFIG_REG, 0x02); }
 
 int
 EMG_ADS1293::setup(int route_table[3][2],
-           bool chx_enable[3],
-           bool chx_high_res[3],
-           bool chx_high_freq[3],
-           int R1[3],
-           int R2,
-           int R3[3],
-           bool clock_intern)
+                   bool chx_enable[3],
+                   bool chx_high_res[3],
+                   bool chx_high_freq[3],
+                   int R1[3],
+                   int R2,
+                   int R3[3],
+                   bool clock_intern)
 {
     CLK_SRC clk_src = (clock_intern)
                           ? INTERN
@@ -61,31 +60,35 @@ EMG_ADS1293::setup(int route_table[3][2],
 
     // standby mode (0x02)
     int n = this->set_mode(POWER_DOWN);
-    n += this->config_clock(true, clk_src, true);
+    n += this->config_clock(false, clk_src, false);
     n += this->route_channel(0, route_table[0][0], route_table[0][1]);
     n += this->route_channel(1, route_table[1][0], route_table[1][1]);
     n += this->route_channel(2, route_table[2][0], route_table[2][1]);
+
+    // this->route_channel_test(0, false, true);
+    // this->route_vbat(true, false, false);
+
     n += this->enable_ADC(chx_enable[0], chx_enable[1], chx_enable[2]);
     n += this->config_resolution(chx_high_res[0], chx_high_res[1],
                                  chx_high_res[2]);
     n += this->config_frequence(chx_high_freq[0], chx_high_freq[1],
                                 chx_high_freq[2]);
-    n += this->config_R1(R1[0], R1[0], R1[2]);
-    n += this->config_R2(R2);
-    n += this->config_R3(0, R3[0]);
-    n += this->config_R3(1, R3[1]);
-    n += this->config_R3(2, R3[2]);
-    logln("Seting n=" + std::to_string(n), true);
+    this->set_filters(R1, R2, R3);
+
+    // logln("Seting n=" + std::to_string(n), true);
+    this->config_clock(true, clk_src, false);
 
     bool ret = is_clock_ext();
-    logln("Seting ", true);
     std::string clk_src_s = std::string(ret ? "extern" : "intern");
-    logln("Seting ", true);
+
+    this->update_adc_max();
+
+    this->get_filters(R1, &R2, R3);
 
     int range[3] = {0, 1, 2};
 
-    logln("Seting up ADS1293 : " + ((n == 13) ? fstr(" OK", {BOLD, FG_GREEN})
-                                              : fstr(" ERROR", {BOLD, FG_RED})),
+    logln("Seting up ADS1293 : " + ((n == 8) ? fstr(" OK", {BOLD, FG_GREEN})
+                                             : fstr(" ERROR", {BOLD, FG_RED})),
           true);
     logln("Set clock on CLK " + clk_src_s);
     logln("           |   Ch1   |   Ch2   |   Ch3   |");
@@ -112,13 +115,13 @@ EMG_ADS1293::setup(int route_table[3][2],
     log("   R1      |", true);
     for(int i : {0, 1, 2})
     {
-        R1[i] = get_R1(i);
+        // R1[i] = get_R1(i);
         log("   " + std::string(3 - std::to_string(R1[i]).size(), ' ') +
             std::to_string(R1[i]) + "   |");
     }
     logln("");
 
-    R2 = get_R2();
+    // R2 = get_R2();
     logln("   R2      |             " +
           std::string(3 - std::to_string(R2).size(), ' ') + std::to_string(R2) +
           "             |");
@@ -126,7 +129,7 @@ EMG_ADS1293::setup(int route_table[3][2],
     log("   R3      |", true);
     for(int i : {0, 1, 2})
     {
-        R3[i] = get_R3(i);
+        // R3[i] = get_R3(i);
         log("   " + std::string(3 - std::to_string(R3[i]).size(), ' ') +
             std::to_string(R3[i]) + "   |");
     }
@@ -142,19 +145,35 @@ EMG_ADS1293::route_channel(uint8_t channel, uint8_t pos_in, uint8_t neg_in)
 
     channel = ((channel < 0) ? 0 : (channel > 2) ? 2 : channel);
     uint8_t val = pos_in | (neg_in << 3);
-    if(pos_in==neg_in)
-        val|=0xc0;
+    if(pos_in == neg_in)
+        val |= 0xc0;
     m_regs[FLEX_CH0_CN_REG + channel] = val;
-    logln("route_channel " + std::to_string(channel) + " " + std::to_string(pos_in) + " " + std::to_string(neg_in) + " " + std::to_string(val), true);
-    std::cout << std::hex << (int)val << std::dec << std::endl;
-    return this->writeReg( FLEX_CH0_CN_REG + channel, val);
+    return this->writeReg(FLEX_CH0_CN_REG + channel, val);
+}
+
+int
+EMG_ADS1293::route_channel_test(uint8_t channel, bool pos_test, bool neg_test)
+{
+    channel = ((channel < 0) ? 0 : (channel > 2) ? 2 : channel);
+    uint8_t val = (pos_test ? 0x80 : 0) | (neg_test ? 0x40 : 0);
+    m_regs[FLEX_CH0_CN_REG + channel] = val;
+    return this->writeReg(FLEX_CH0_CN_REG + channel, val);
+}
+
+int
+EMG_ADS1293::route_vbat(bool ch1, bool ch2, bool ch3)
+{
+    uint8_t val = (ch1 ? 0x1 : 0x0) | (ch2 ? 0x2 : 0x0) | (ch3 ? 0x4 : 0x0);
+    m_regs[FLEX_VBAT_CN_REG] = val;
+    return this->writeReg(FLEX_VBAT_CN_REG, val);
 }
 
 int
 EMG_ADS1293::get_route_neg(int ch)
 {
     uint8_t val = 0;
-    this->readReg( FLEX_CH0_CN_REG + ch, 1, &val);
+    this->readReg(FLEX_CH0_CN_REG + ch, 1, &val);
+    // printf("get_route_neg: 0x%02X\n", val);
     return ((val & 0b111000) >> 3);
 }
 
@@ -162,7 +181,7 @@ int
 EMG_ADS1293::get_route_pos(int ch)
 {
     uint8_t val = 0;
-    this->readReg( FLEX_CH0_CN_REG + ch, 1, &val);
+    this->readReg(FLEX_CH0_CN_REG + ch, 1, &val);
     return (val & 0b111);
 }
 
@@ -171,14 +190,14 @@ EMG_ADS1293::set_mode(Mode mode)
 {
     m_mode = mode;
     m_regs[CONFIG_REG] = mode;
-    return this->writeReg( CONFIG_REG, mode);
+    return this->writeReg(CONFIG_REG, mode);
 }
 
 EMG_ADS1293::Mode
 EMG_ADS1293::get_mode()
 {
     uint8_t val = 0;
-    this->readReg( CONFIG_REG, 1, &val);
+    this->readReg(CONFIG_REG, 1, &val);
     return (Mode)(val);
 }
 
@@ -187,14 +206,15 @@ EMG_ADS1293::config_clock(bool start, CLK_SRC src, bool en_output)
 {
     uint8_t val = (start ? 0x4 : 0x0) | (src << 1) | (en_output ? 0x1 : 0x0);
     m_regs[OSC_CN_REG] = val;
-    return this->writeReg( OSC_CN_REG, val);
+    return this->writeReg(OSC_CN_REG, val);
 }
 
 bool
 EMG_ADS1293::is_clock_started()
 {
     uint8_t val = 0;
-    this->readReg( OSC_CN_REG, 1, &val);
+    this->readReg(OSC_CN_REG, 1, &val);
+    // printf("is_clock_started: 0x%02X\n", val);
     return (val >> 2) & 0b1;
 }
 
@@ -202,8 +222,9 @@ bool
 EMG_ADS1293::is_clock_ext()
 {
     uint8_t val = 0;
-    this->readReg( OSC_CN_REG, 1, &val);
+    this->readReg(OSC_CN_REG, 1, &val);
     bool ret = (val >> 1) & 0b1;
+    // printf("is_clock_ext: 0x%02X\n", val);
     //logln("is_clock_ext: " + std::to_string(ret));
     return ret;
 }
@@ -212,13 +233,16 @@ bool
 EMG_ADS1293::is_clock_output_enabled()
 {
     uint8_t val = 0;
-    this->readReg( OSC_CN_REG, 1, &val);
+    this->readReg(OSC_CN_REG, 1, &val);
     return (val & 0b1);
 }
 
 int
 EMG_ADS1293::enable_ADC(bool ch0, bool ch1, bool ch2)
 {
+    m_adc_enabled[0] = ch0;
+    m_adc_enabled[1] = ch1;
+    m_adc_enabled[2] = ch2;
     uint8_t val =
         (ch0 ? 0 : 0b001001) | (ch1 ? 0 : 0b010010) | (ch2 ? 0 : 0b100100);
     m_regs[AFE_SHDN_CN_REG] = val;
@@ -229,7 +253,7 @@ bool
 EMG_ADS1293::is_ADC_enabled(int ch)
 {
     uint8_t val = 0;
-    this->readReg( AFE_SHDN_CN_REG, 1, &val);
+    this->readReg(AFE_SHDN_CN_REG, 1, &val);
     uint8_t mask = 0b001001;
     return !(val & (mask << ch));
 }
@@ -240,14 +264,14 @@ EMG_ADS1293::enable_SDM(bool ch0, bool ch1, bool ch2)
     uint8_t val = (m_regs[AFE_SHDN_CN_REG] & 0b111) | (ch0 ? 0 : 0b1000) |
                   (ch1 ? 0 : 0b10000) | (ch2 ? 0 : 0b100000);
     m_regs[AFE_SHDN_CN_REG] = val;
-    return this->writeReg( AFE_SHDN_CN_REG, val);
+    return this->writeReg(AFE_SHDN_CN_REG, val);
 }
 
 bool
 EMG_ADS1293::is_SDM_enabled(int ch)
 {
     uint8_t val = 0;
-    this->readReg( AFE_SHDN_CN_REG, 1, &val);
+    this->readReg(AFE_SHDN_CN_REG, 1, &val);
     return !((val >> (3 + ch)) & 0b1);
 }
 
@@ -257,197 +281,229 @@ EMG_ADS1293::enable_INA(bool ch0, bool ch1, bool ch2)
     uint8_t val = (m_regs[AFE_SHDN_CN_REG] & 0b111000) | (ch0 ? 0 : 0b1) |
                   (ch1 ? 0 : 0b10) | (ch2 ? 0 : 0b100);
     m_regs[AFE_SHDN_CN_REG] = val;
-    return this->writeReg( AFE_SHDN_CN_REG, val);
+    return this->writeReg(AFE_SHDN_CN_REG, val);
 }
 
 bool
 EMG_ADS1293::is_INA_enabled(int ch)
 {
     uint8_t val = 0;
-    this->readReg( AFE_SHDN_CN_REG, 1, &val);
+    this->readReg(AFE_SHDN_CN_REG, 1, &val);
     return !((val >> (ch)) & 0b1);
 }
 
 int
-EMG_ADS1293::config_resolution(bool ch0_high_res, bool ch1_high_res, bool ch2_high_res)
+EMG_ADS1293::config_resolution(bool ch0_high_res,
+                               bool ch1_high_res,
+                               bool ch2_high_res)
 {
     uint8_t val = (m_regs[AFE_RES_REG] & 0b00111000) |
                   (ch0_high_res ? 0b1 : 0) | (ch2_high_res ? 0b010 : 0) |
                   (ch2_high_res ? 0b100 : 0);
     m_regs[AFE_RES_REG] = val;
-    return this->writeReg( AFE_RES_REG, val);
+    return this->writeReg(AFE_RES_REG, val);
 }
 
 bool
 EMG_ADS1293::is_high_res_enabled(int ch)
 {
     uint8_t val = 0;
-    this->readReg( AFE_RES_REG, 1, &val);
+    this->readReg(AFE_RES_REG, 1, &val);
     return ((val >> (ch)) & 0b1);
 }
 
 int
 EMG_ADS1293::config_frequence(bool ch0_freq_double,
-                      bool ch1_freq_double,
-                      bool ch2_freq_double)
+                              bool ch1_freq_double,
+                              bool ch2_freq_double)
 {
     uint8_t val =
         (m_regs[AFE_RES_REG] & 0b111) | (ch0_freq_double ? 0b1000 : 0) |
         (ch1_freq_double ? 0b010000 : 0) | (ch2_freq_double ? 0b100000 : 0);
     m_regs[AFE_RES_REG] = val;
-    return this->writeReg( AFE_RES_REG, val);
+    return this->writeReg(AFE_RES_REG, val);
 }
 
 bool
 EMG_ADS1293::is_high_freq_enabled(int ch)
 {
     uint8_t val = 0;
-    this->readReg( AFE_RES_REG, 1, &val);
+    this->readReg(AFE_RES_REG, 1, &val);
     return ((val >> (ch + 3)) & 0b1);
 }
 
-int
-EMG_ADS1293::config_R1(uint8_t R1_ch0, uint8_t R1_ch1, uint8_t R1_ch2)
+void
+EMG_ADS1293::get_filters(int R1[3], int *R2, int R3[3])
 {
-    R1_ch0 = (R1_ch0 < 3) ? 0b001 : 0; //2 or 4
-    R1_ch1 = (R1_ch1 < 3) ? 0b010 : 0; //2 or 4
-    R1_ch2 = (R1_ch2 < 3) ? 0b100 : 0; //2 or 4
-    uint8_t val = R1_ch0 | R1_ch1 | R1_ch2;
-    m_regs[R1_RATE_REG] = val;
-    return this->writeReg( R1_RATE_REG, val);
-}
-
-int
-EMG_ADS1293::get_R1(int ch)
-{
-    uint8_t val = 0;
-    this->readReg( R1_RATE_REG, 1, &val);
-    return ((val >> ch) & 0b1) ? 2 : 4;
-}
-
-int
-EMG_ADS1293::config_R2(uint8_t R2)
-{
-    bool R3_val =
-        (m_regs[R3_RATE_CH0_REG] == 0b10 || m_regs[R3_RATE_CH0_REG] == 0b1000)
-            ? false
-            : true;
-    if(R2 < 5)
+    this->readReg(R1_RATE_REG, 1, &m_regs[R1_RATE_REG]);
+    for(int i = 0; i < 3; i++)
     {
-        R2 = 0b0001; //4
-        m_fast_adc_max = 0x8000;
-        for(int i = 0; i < 3; i++)
-            m_precise_adc_max[i] = R3_val ? 0x800000 : 0xF30000;
+        R1[i] = ((m_regs[R1_RATE_REG] >> i) & 0b1) ? 2 : 4;
+        this->readReg(R3_RATE_CH0_REG + i, 1, &m_regs[R3_RATE_CH0_REG + i]);
+        switch(m_regs[R3_RATE_CH0_REG + i])
+        {
+        case 0b00000001:
+            R3[i] = 4;
+            break;
+        case 0b00000010:
+            R3[i] = 6;
+            break;
+        case 0b00000100:
+            R3[i] = 8;
+            break;
+        case 0b00001000:
+            R3[i] = 12;
+            break;
+        case 0b00010000:
+            R3[i] = 16;
+            break;
+        case 0b00100000:
+            R3[i] = 32;
+            break;
+        case 0b01000000:
+            R3[i] = 64;
+            break;
+        case 0b10000000:
+            R3[i] = 128;
+            break;
+        default:
+            R3[i] = 0;
+            break;
+        }
     }
-    else if(R2 < 6)
-    {
-        R2 = 0b0010; //5
-        m_fast_adc_max = 0xC350;
-        for(int i = 0; i < 3; i++)
-            m_precise_adc_max[i] = R3_val ? 0xC35000 : 0xB964F0;
-    }
-    else if(R2 < 8)
-    {
-        R2 = 0b0100; //6
-        m_fast_adc_max = 0xF300;
-        for(int i = 0; i < 3; i++)
-            m_precise_adc_max[i] = R3_val ? 0xF30000 : 0xE6A900;
-    }
-    else
-    {
-        R2 = 0b1000; //8
-        m_fast_adc_max = 0x8000;
-        for(int i = 0; i < 3; i++)
-            m_precise_adc_max[i] = R3_val ? 0x800000 : 0xF30000;
-    }
-    m_regs[R2_RATE_REG] = R2;
-    return this->writeReg( R2_RATE_REG, R2);
-}
-
-int
-EMG_ADS1293::get_R2(int ch)
-{
-    uint8_t val = 0;
-    this->readReg( R2_RATE_REG, 1, &val);
-    switch(val & 0b1111)
+    this->readReg(R2_RATE_REG, 1, &m_regs[R2_RATE_REG]);
+    switch(m_regs[R2_RATE_REG] & 0b1111)
     {
     case 0b0001:
-        return 4;
+        *R2 = 4;
+        break;
     case 0b0010:
-        return 5;
+        *R2 = 5;
+        break;
     case 0b0100:
-        return 6;
+        *R2 = 6;
+        break;
     case 0b1000:
-        return 8;
+        *R2 = 8;
+        break;
     default:
-        return 0;
+        *R2 = 0;
+        break;
     }
 }
 
-int
-EMG_ADS1293::config_R3(int ch, uint8_t R3)
+void
+EMG_ADS1293::update_adc_max()
 {
-    if(R3 < 6)
-        R3 = 0b00000001; //4
-    else if(R3 < 8)
-        R3 = 0b00000010; //6
-    else if(R3 < 11)
-        R3 = 0b00000100; //8
-    else if(R3 < 15)
-        R3 = 0b00001000; //12
-    else if(R3 < 25)
-        R3 = 0b00010000; //16
-    else if(R3 < 49)
-        R3 = 0b00100000; //32
-    else if(R3 < 97)
-        R3 = 0b01000000; //64
-    else
-        R3 = 0b10000000; //128
+    int R1[3], R2, R3[3];
+    get_filters(R1, &R2, R3);
 
-    //change conv max adc
-    bool R3_val = (R3 == 0b10 || R3 == 0b1000) ? false : true;
-    if(m_regs[R2_RATE_REG] == 0b0010)
-        m_precise_adc_max[ch] = R3_val ? 0xC35000 : 0xB964F0;
-    else if(m_regs[R2_RATE_REG] == 0b0100)
-        m_precise_adc_max[ch] = R3_val ? 0xF30000 : 0xE6A900;
-    else
-        m_precise_adc_max[ch] = R3_val ? 0x800000 : 0xF30000;
-
-    m_regs[R3_RATE_CH0_REG + ch] = R3;
-    return this->writeReg( R3_RATE_CH0_REG + ch, R3);
+    for(int i = 0; i < 3; i++)
+    {
+        switch(R2)
+        {
+        case 4:
+            m_fast_adc_max = 0x8000;
+            m_precise_adc_max[i] = 0x800000;
+            if(R3[i] == 6 || R3[i] == 12)
+                m_precise_adc_max[i] = 0xF30000;
+            break;
+        case 5:
+            m_fast_adc_max = 0xC350;
+            m_precise_adc_max[i] = 0xC35000;
+            if(R3[i] == 8 || R3[i] == 16)
+                m_precise_adc_max[i] = 0xB964F0;
+            break;
+        case 6:
+            m_fast_adc_max = 0xF300;
+            m_precise_adc_max[i] = 0xF30000;
+            if(R3[i] == 8 || R3[i] == 16)
+                m_precise_adc_max[i] = 0xE6A900;
+            break;
+        case 8:
+            m_fast_adc_max = 0x8000;
+            m_precise_adc_max[i] = 0x800000;
+            if(R3[i] == 6 || R3[i] == 12)
+                m_precise_adc_max[i] = 0xF30000;
+            break;
+        }
+    }
 }
 
-int
-EMG_ADS1293::get_R3(int ch)
+void
+EMG_ADS1293::set_filters(int R1[3], int R2, int R3[3])
 {
     uint8_t val = 0;
-    this->readReg(R3_RATE_CH0_REG + ch, 1, &val);
-    switch(val)
+    for(int i = 0; i < 3; i++) { val |= ((R1[i] == 2) ? 0b1 : 0) << i; }
+    m_regs[R1_RATE_REG] = val;
+    this->writeReg(R1_RATE_REG, val);
+
+    val = 0;
+    switch(R2)
     {
-    case 0b00000001:
-        return 4;
-    case 0b00000010:
-        return 6;
-    case 0b00000100:
-        return 8;
-    case 0b00001000:
-        return 12;
-    case 0b00010000:
-        return 16;
-    case 0b00100000:
-        return 32;
-    case 0b01000000:
-        return 64;
-    case 0b10000000:
-        return 128;
+    case 4:
+        val = 0b0001;
+        break;
+    case 5:
+        val = 0b0010;
+        break;
+    case 6:
+        val = 0b0100;
+        break;
+    case 8:
+        val = 0b1000;
+        break;
     default:
-        return 0;
+        val = 0;
+        break;
     }
+    m_regs[R2_RATE_REG] = val;
+    this->writeReg(R2_RATE_REG, val);
+
+    for(int i = 0; i < 3; i++)
+    {
+        val = 0;
+        switch(R3[i])
+        {
+        case 4:
+            val = 0b00000001;
+            break;
+        case 6:
+            val = 0b00000010;
+            break;
+        case 8:
+            val = 0b00000100;
+            break;
+        case 12:
+            val = 0b00001000;
+            break;
+        case 16:
+            val = 0b00010000;
+            break;
+        case 32:
+            val = 0b00100000;
+            break;
+        case 64:
+            val = 0b01000000;
+            break;
+        case 128:
+            val = 0b10000000;
+            break;
+        default:
+            val = 0;
+            break;
+        }
+        m_regs[R3_RATE_CH0_REG + i] = val;
+        this->writeReg(R3_RATE_CH0_REG + i, val);
+    }
+    update_adc_max();
 }
 
 double
 EMG_ADS1293::precise_value(int ch, bool converted)
 {
+    if(!m_adc_enabled[ch])
+        return 0;
     if(converted)
         return conv(ch, *m_precise_value[ch]);
     else
@@ -457,6 +513,8 @@ EMG_ADS1293::precise_value(int ch, bool converted)
 double
 EMG_ADS1293::fast_value(int ch, bool converted)
 {
+    if(!m_adc_enabled[ch])
+        return 0;
     if(converted)
         return conv(m_fast_value[ch]);
     else
@@ -466,8 +524,10 @@ EMG_ADS1293::fast_value(int ch, bool converted)
 double
 EMG_ADS1293::read_fast_value(int ch, bool converted)
 {
+    if(!m_adc_enabled[ch])
+        return 0;
     this->readReg(DATA_CH0_PACE_REG + 2 * ch, 2,
-                      (uint8_t*)&(m_fast_value[ch]));
+                  (uint8_t *)&(m_fast_value[ch]));
     if(converted)
         return conv(m_fast_value[ch]);
     else
@@ -477,8 +537,9 @@ EMG_ADS1293::read_fast_value(int ch, bool converted)
 double
 EMG_ADS1293::read_precise_value(int ch, bool converted)
 {
-    this->readReg(DATA_CH0_ECG_REG + 3 * ch, 3,
-                      (uint8_t*)m_precise_value[ch]);
+    if(!m_adc_enabled[ch])
+        return 0;
+    this->readReg(DATA_CH0_ECG_REG + 3 * ch, 3, (uint8_t *)m_precise_value[ch]);
     //logln("read_precise_value, n=" + std::to_string(n) + " reg=" + std::to_string(m_regs[DATA_CH0_ECG_REG + 3 * ch]) + " " + std::to_string(m_regs[DATA_CH0_ECG_REG + 3 * ch + 1]) + " " + std::to_string(m_regs[DATA_CH0_ECG_REG + 3 * ch + 2]), true);
     if(converted)
         return conv(ch, *m_precise_value[ch]);
@@ -508,17 +569,8 @@ EMG_ADS1293::read_precise_value(int ch, bool converted)
 double
 EMG_ADS1293::conv(uint16_t val)
 {
-    // uint16_t lim = 0x8000;
-    // if((uint16_t)val > lim)
-    // std::cout << "16conv " << std::hex << __builtin_bswap16(val) << " "
-    //           << m_fast_adc_max << std::dec << std::endl;
-    // std::cout << "conv " << std::hex << __builtin_bswap16(val) << " "
-    //           << std::dec
-    //           << (__builtin_bswap16(val) * 1. / m_fast_adc_max - 0.5) *
-    //                  4.8 / 3.5 * 1000
-    //           << std::endl;
-    return (__builtin_bswap16(val) * 1. / m_fast_adc_max - 0.5) * 4.8 / 3.5 *
-           1000;
+    return (__builtin_bswap16(val) * 1. / m_fast_adc_max - 0.5) * 4.8 / 3.5;
+    // return ((__builtin_bswap16(val) * 1. / m_fast_adc_max - 0.5) * 3.246+1)*2.4;
 }
 
 double
@@ -528,14 +580,14 @@ EMG_ADS1293::conv(int ch, int32_t val)
     //std::cout << "32conv " << std::hex << (__builtin_bswap32(val) >> 8) << " "
     //           << m_precise_adc_max[ch] << std::dec << std::endl;
     return ((__builtin_bswap32(val) >> 8) * 1. / m_precise_adc_max[ch] - 0.5) *
-           4.8 / 3.5 * 1000;
+           4.8 / 3.5;
+    // return (((__builtin_bswap32(val) >> 8) * 1. / m_precise_adc_max[ch] - 0.5) * 3.246+1)*2.4;
 }
 
 int
 EMG_ADS1293::get_error()
 {
-    return this->readReg( ERROR_LOD_REG, 7,
-                             &m_regs[ERROR_LOD_REG]);
+    return this->readReg(ERROR_LOD_REG, 7, &m_regs[ERROR_LOD_REG]);
     //return (Error *)&(m_regs[ERROR_LOD_REG]);
 }
 

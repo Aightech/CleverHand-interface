@@ -4,6 +4,7 @@
 #include "clvHdADS1293EMG.hpp"
 #include "clvHdDevice.hpp"
 #include <boost/python.hpp>
+#include <limits>  // For std::numeric_limits
 
 using namespace boost::python;
 
@@ -53,17 +54,38 @@ class pyDevice : public ClvHd::Device
         ClvHd::EMG_ADS1293::start_acquisition(*this);
     }
 
-    boost::python::list
+    boost::python::tuple
     read_all()
     {
         int nb_modules = 0;
         nb_modules = ClvHd::EMG_ADS1293::nb_modules;
-        std::vector<double> sample(nb_modules * 6);
-        uint64_t timestamp = ClvHd::EMG_ADS1293::read_all(*this, sample.data());
-        boost::python::list l;
-        l.append(timestamp);
-        for(int i = 0; i < nb_modules * 6; i++) l.append(sample[i]);
-        return l;
+        double fast[nb_modules * 3];
+        double precise[nb_modules * 3];
+        uint8_t flags[nb_modules];
+        uint64_t timestamp =
+            ClvHd::EMG_ADS1293::read_all(*this, fast, precise, flags);
+        boost::python::list fast_list;
+        boost::python::list precise_list;
+        for(int i = 0; i < nb_modules; i++)
+        {
+            boost::python::list fast_ch;
+            boost::python::list precise_ch;
+            for(int j = 0; j < 3; j++)
+            {
+                //check if the value is available
+                if((flags[i]>>(2+j))&0b1)
+                    fast_ch.append(fast[3 * i + j]);
+                else//add NaN
+                    fast_ch.append(std::numeric_limits<double>::quiet_NaN());
+                if((flags[i]>>(5+j))&0b1)
+                    precise_ch.append(precise[3 * i + j]);
+                else//add NaN
+                    precise_ch.append(std::numeric_limits<double>::quiet_NaN());
+            }
+            fast_list.append(fast_ch);
+            precise_list.append(precise_ch);
+        }
+        return boost::python::make_tuple(timestamp, fast_list, precise_list);
     }
 
     void
@@ -79,9 +101,10 @@ class pyDevice : public ClvHd::Device
                           extract<uint8_t>(rgb[1]), extract<uint8_t>(rgb[2]));
     }
 
-    int nbModules()
+    int
+    nbModules()
     {
-        return  this->nb_modules;
+        return this->nb_modules;
     }
 };
 } // namespace ClvHd
@@ -91,7 +114,8 @@ BOOST_PYTHON_MODULE(pyclvhd)
 
     class_<ClvHd::pyDevice>("Device", init<int>(arg("verbose") = -1))
         .def("setup", &ClvHd::pyDevice::setup, "Setup the device")
-        .def("nbModules", &ClvHd::pyDevice::nbModules, "Get the number of modules")
+        .def("nbModules", &ClvHd::pyDevice::nbModules,
+             "Get the number of modules")
         .def("open_connection", &ClvHd::pyDevice::open_connection,
              (arg("path"), arg("baudrate") = 500000),
              "Open the serial connection between the computer and the "

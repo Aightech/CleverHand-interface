@@ -107,6 +107,13 @@ class EMG_ADS1293 : public Module, virtual public ESC::CLI
 
     int
     route_channel(uint8_t channel, uint8_t pos_in, uint8_t neg_in);
+
+    int
+    route_channel_test(uint8_t channel, bool pos_test, bool neg_test);
+
+    int
+    route_vbat(bool ch1, bool ch2, bool ch3);
+
     int
     get_route_neg(int ch);
     int
@@ -155,23 +162,13 @@ class EMG_ADS1293 : public Module, virtual public ESC::CLI
     bool
     is_high_res_enabled(int ch);
 
-    //2 or 4
-    int
-    config_R1(uint8_t R1_ch1, uint8_t R1_ch2, uint8_t R1_ch3);
-    int
-    get_R1(int ch);
+    void
+    set_filters(int R1[3], int R2, int R3[3]);
+    void
+    get_filters(int R1[3], int *R2, int R3[3]);
 
-    //4, 5, 6 or 8
-    int
-    config_R2(uint8_t R2);
-    int
-    get_R2(int ch = 0);
-
-    //4, 6, 8, 12, 16, 32, 64, 128
-    int
-    config_R3(int ch, uint8_t R3);
-    int
-    get_R3(int ch);
+    void
+    update_adc_max();
 
     double
     read_precise_value(int ch, bool converted = true);
@@ -282,10 +279,10 @@ class EMG_ADS1293 : public Module, virtual public ESC::CLI
                 // std::cout << "[ADS1293_test] start acquisition module " << i
                 //           << std::endl;
                 s_cli.logln("start acquisition module " + std::to_string(i),
-                          true);
+                            true);
                 EMG_ADS1293 *emg = EMG_ADS1293::getModule(device, i);
                 emg->set_mode(EMG_ADS1293::START_CONV);
-                s_cli.logln("mode: " + std::to_string(emg->get_mode()), true);
+                // s_cli.logln("mode: " + std::to_string(emg->get_mode()), true);
             }
         }
     };
@@ -300,14 +297,17 @@ class EMG_ADS1293 : public Module, virtual public ESC::CLI
     };
 
     static uint64_t
-    read_all(Device &device, double *sample)
+    read_all(Device &device,
+             double *fast,
+             double *precise,
+             uint8_t *flags = nullptr)
     {
         uint64_t timestamp = 0;
         uint8_t buffer[16 * EMG_ADS1293::nb_modules];
 
         uint8_t cmd = ADS1293_Reg::DATA_STATUS_REG | 0b10000000;
-        int n = device.controller.readCmd_multi(
-            modules_mask, 1, &cmd, 16, buffer, &timestamp);
+        int n = device.controller.readCmd_multi(modules_mask, 1, &cmd, 16,
+                                                buffer, &timestamp);
         if(n != 16 * EMG_ADS1293::nb_modules)
         {
             std::cerr << "Error reading EMG data" << std::endl;
@@ -317,6 +317,10 @@ class EMG_ADS1293 : public Module, virtual public ESC::CLI
         for(int i = 0, index = 0; i < device.nb_modules; i++)
             if(modules_mask & (((uint32_t)1) << i))
             {
+                // printf("Status register: 0x%02X (0b", buffer[16 * index]);
+                // for(int j = 0; j < 8; j++)
+                //     printf("%d", (buffer[16 * index] >> (7 - j)) & 1);
+                // printf(")\n");
                 EMG_ADS1293 *emg = EMG_ADS1293::getModule(device, i);
                 std::copy(buffer + 16 * index,       //index-th status register
                           buffer + 16 * (index + 1), //last sample byte
@@ -324,14 +328,15 @@ class EMG_ADS1293 : public Module, virtual public ESC::CLI
                 for(int ch = 0; ch < 3; ch++)
                 {
                     //fast value (2 bytes)
-                    sample[6 * index + 2 * ch] = emg->fast_value(ch);
+                    fast[6 * index + ch] = emg->fast_value(ch);
                     //precise value (3 bytes)
-                    sample[6 * index + 2 * ch + 1] = emg->precise_value(ch);
+                    precise[6 * index + ch] = emg->precise_value(ch);
                 }
+                if(flags != nullptr)
+                    flags[index] = buffer[16 * index];
                 index++;
             }
         return timestamp;
-        return 0;
     };
 
     // each bit represent if the module has the class type
@@ -341,6 +346,7 @@ class EMG_ADS1293 : public Module, virtual public ESC::CLI
     private:
     Mode m_mode;
     uint8_t m_regs[0x50];
+    bool m_adc_enabled[3] = {false, false, false};
 
     //ESC::CLI for static functions
     static ESC::CLI s_cli;

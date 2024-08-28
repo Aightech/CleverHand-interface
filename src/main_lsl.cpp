@@ -36,17 +36,19 @@ main(int argc, char *argv[])
         //start the emg modules
         ClvHd::EMG_ADS1293::start_acquisition(device);
 
-        int nb_ch = nb_EMG_module * 6;
-        lsl::stream_info info_sample("EMG", "sample", nb_ch, 0,
+        int nb_ch = nb_EMG_module * 3;
+        lsl::stream_info info_sample("EMG", "sample_fast", nb_ch, 0,
                                      lsl::cf_double64);
         lsl::stream_outlet outlet_sample(info_sample);
-        std::vector<double> sample(nb_ch);
+        std::vector<double> sample_fast(nb_ch);
+        std::vector<double> sample_precise(nb_ch);
+        uint8_t flags[nb_EMG_module];
         std::cout << "[INFOS] Now sending data... " << std::endl;
         for(int t = 0;; t++)
         {
-            uint64_t timestamp = ClvHd::EMG_ADS1293::read_all(device, sample.data());
+            uint64_t timestamp = ClvHd::EMG_ADS1293::read_all(device, sample_fast.data(), sample_precise.data(), flags);
             std::cout << "timestamp: " << timestamp << " ";
-            outlet_sample.push_sample(sample, timestamp/1000000.0);
+            outlet_sample.push_sample(sample_fast, timestamp/1000000.0);
         }
         // for(int t = 0;; t++)
         // {
