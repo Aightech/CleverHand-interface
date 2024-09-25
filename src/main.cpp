@@ -13,7 +13,7 @@ main(int argc, char *argv[])
         ClvHd::Device device(3);
 
         //open the serial connection between the computer and the controller board
-        device.controller.open_connection("/dev/ttyACM0", 500000,
+        device.controller.open_connection("/dev/tty.usbmodem145149601", 500000,
                                           O_RDWR | O_NOCTTY);
         usleep(500000);
 

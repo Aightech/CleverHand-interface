@@ -1,7 +1,7 @@
 [submodule "lib/com_client"]
 	path = lib/com_client
 	url = ../com_client
-	branch = macOS
+	branch = macOS-compa
 [submodule "lib/strANSIseq"]
 	path = lib/strANSIseq
 	url = ../strANSIseq
