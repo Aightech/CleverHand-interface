@@ -1,11 +1,8 @@
-[submodule "tool_lib/built_lsl"]
-	path = tool_lib/built_lsl
-	url = ../built_lsl.git
-	branch = main
 [submodule "lib/com_client"]
 	path = lib/com_client
-	url = ../com_client.git
+	url = ../com_client
+	branch = macOS
 [submodule "lib/strANSIseq"]
 	path = lib/strANSIseq
 	url = ../strANSIseq
-	branch = main
+	branch = macOS
