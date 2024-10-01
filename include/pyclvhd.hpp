@@ -3,10 +3,11 @@
 
 #include "clvHdADS1293EMG.hpp"
 #include "clvHdDevice.hpp"
-#include <boost/python.hpp>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 #include <limits>  // For std::numeric_limits
 
-using namespace boost::python;
+namespace py = pybind11;
 
 namespace ClvHd
 {
@@ -17,33 +18,33 @@ class pyDevice : public ClvHd::Device
         : ClvHd::Device(verbose), ESC::CLI(verbose, "pyClvHd-Device") {};
 
     void
-    setupADS1293(boost::python::list _route_table,
-                 boost::python::list _chx_enable,
-                 boost::python::list _chx_high_res,
-                 boost::python::list _chx_high_freq,
-                 boost::python::list _R1,
+    setupADS1293(py::list _route_table,
+                 py::list _chx_enable,
+                 py::list _chx_high_res,
+                 py::list _chx_high_freq,
+                 py::list _R1,
                  int R2,
-                 boost::python::list _R3)
+                 py::list _R3)
     {
-        int route_table[3][2] = {{extract<int>(_route_table[0][0]),
-                                  extract<int>(_route_table[0][1])},
-                                 {extract<int>(_route_table[1][0]),
-                                  extract<int>(_route_table[1][1])},
-                                 {extract<int>(_route_table[2][0]),
-                                  extract<int>(_route_table[2][1])}};
-        bool chx_enable[3] = {extract<bool>(_chx_enable[0]),
-                              extract<bool>(_chx_enable[1]),
-                              extract<bool>(_chx_enable[2])};
-        bool chx_high_res[3] = {extract<bool>(_chx_high_res[0]),
-                                extract<bool>(_chx_high_res[1]),
-                                extract<bool>(_chx_high_res[2])};
-        bool chx_high_freq[3] = {extract<bool>(_chx_high_freq[0]),
-                                 extract<bool>(_chx_high_freq[1]),
-                                 extract<bool>(_chx_high_freq[2])};
-        int R1[3] = {extract<int>(_R1[0]), extract<int>(_R1[1]),
-                     extract<int>(_R1[2])};
-        int R3[3] = {extract<int>(_R3[0]), extract<int>(_R3[1]),
-                     extract<int>(_R3[2])};
+        int route_table[3][2] = {{_route_table[0].cast<int>(),
+                                  _route_table[1].cast<int>()},
+                                 {_route_table[2].cast<int>(),
+                                  _route_table[3].cast<int>()},
+                                 {_route_table[4].cast<int>(),
+                                  _route_table[5].cast<int>()}};
+        bool chx_enable[3] = {_chx_enable[0].cast<bool>(),
+                              _chx_enable[1].cast<bool>(),
+                              _chx_enable[2].cast<bool>()};
+        bool chx_high_res[3] = {_chx_high_res[0].cast<bool>(),
+                                _chx_high_res[1].cast<bool>(),
+                                _chx_high_res[2].cast<bool>()};
+        bool chx_high_freq[3] = {_chx_high_freq[0].cast<bool>(),
+                                 _chx_high_freq[1].cast<bool>(),
+                                 _chx_high_freq[2].cast<bool>()};
+        int R1[3] = {_R1[0].cast<int>(), _R1[1].cast<int>(),
+                     _R1[2].cast<int>()};
+        int R3[3] = {_R3[0].cast<int>(), _R3[1].cast<int>(),
+                     _R3[2].cast<int>()};
         ClvHd::EMG_ADS1293::setup(*this, chx_enable, route_table, chx_high_res,
                                   chx_high_freq, R1, R2, R3);
     }
@@ -54,7 +55,7 @@ class pyDevice : public ClvHd::Device
         ClvHd::EMG_ADS1293::start_acquisition(*this);
     }
 
-    boost::python::tuple
+    py::tuple
     read_all()
     {
         int nb_modules = 0;
@@ -64,12 +65,12 @@ class pyDevice : public ClvHd::Device
         uint8_t flags[nb_modules];
         uint64_t timestamp =
             ClvHd::EMG_ADS1293::read_all(*this, fast, precise, flags);
-        boost::python::list fast_list;
-        boost::python::list precise_list;
+        py::list fast_list;
+        py::list precise_list;
         for(int i = 0; i < nb_modules; i++)
         {
-            boost::python::list fast_ch;
-            boost::python::list precise_ch;
+            py::list fast_ch;
+            py::list precise_ch;
             for(int j = 0; j < 3; j++)
             {
                 //check if the value is available
@@ -85,7 +86,7 @@ class pyDevice : public ClvHd::Device
             fast_list.append(fast_ch);
             precise_list.append(precise_ch);
         }
-        return boost::python::make_tuple(timestamp, fast_list, precise_list);
+        return py::make_tuple(timestamp, fast_list, precise_list);
     }
 
     void
@@ -95,10 +96,10 @@ class pyDevice : public ClvHd::Device
     }
 
     void
-    setRGB(int id_module, int id_led, boost::python::list rgb)
+    setRGB(int id_module, int id_led, py::list rgb)
     {
-        controller.setRGB(id_module, id_led, extract<uint8_t>(rgb[0]),
-                          extract<uint8_t>(rgb[1]), extract<uint8_t>(rgb[2]));
+        controller.setRGB(id_module, id_led, rgb[0].cast<uint8_t>(),
+                          rgb[1].cast<uint8_t>(), rgb[2].cast<uint8_t>());
     }
 
     int
@@ -109,23 +110,23 @@ class pyDevice : public ClvHd::Device
 };
 } // namespace ClvHd
 
-BOOST_PYTHON_MODULE(pyclvhd)
+PYBIND11_MODULE(pyclvhd, m)
 {
-
-    class_<ClvHd::pyDevice>("Device", init<int>(arg("verbose") = -1))
+    py::class_<ClvHd::pyDevice>(m, "Device")
+        .def(py::init<int>(), py::arg("verbose") = -1)
         .def("setup", &ClvHd::pyDevice::setup, "Setup the device")
         .def("nbModules", &ClvHd::pyDevice::nbModules,
              "Get the number of modules")
         .def("open_connection", &ClvHd::pyDevice::open_connection,
-             (arg("path"), arg("baudrate") = 500000),
+             py::arg("path"), py::arg("baudrate") = 500000,
              "Open the serial connection between the computer and the "
              "controller board")
         .def("setRGB", &ClvHd::pyDevice::setRGB,
-             (arg("id_module"), arg("id_led"), arg("rgb")),
+             py::arg("id_module"), py::arg("id_led"), py::arg("rgb"),
              "Set the RGB color of the given LED of the given module")
         .def("setupADS1293", &ClvHd::pyDevice::setupADS1293,
-             (arg("route_table"), arg("chx_enable"), arg("chx_high_res"),
-              arg("chx_high_freq"), arg("R1"), arg("R2"), arg("R3")),
+             py::arg("route_table"), py::arg("chx_enable"), py::arg("chx_high_res"),
+             py::arg("chx_high_freq"), py::arg("R1"), py::arg("R2"), py::arg("R3"),
              "Setup the ADS1293 EMG modules in the device")
         .def("start_acquisition", &ClvHd::pyDevice::start_acquisition,
              "Start the acquisition of the EMG modules")

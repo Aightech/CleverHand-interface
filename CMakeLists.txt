@@ -204,38 +204,43 @@ endif()
 # do_test(canopen 1 1000 0 "")
 # do_test(canopen 2 607A 0 4 d 1000 "")
 
-FIND_PACKAGE(PythonInterp)
-  
-if (PYTHONINTERP_FOUND)
-  if (UNIX AND NOT APPLE)
-    if (PYTHON_VERSION_MAJOR EQUAL 3)
-        FIND_PACKAGE(Boost COMPONENTS python${PYTHON_VERSION_SUFFIX})
-        FIND_PACKAGE(PythonInterp 3)
-        FIND_PACKAGE(PythonLibs 3 REQUIRED)
-    else()
-        FIND_PACKAGE(Boost COMPONENTS python)
-        FIND_PACKAGE(PythonInterp)
-        FIND_PACKAGE(PythonLibs REQUIRED)
-    endif()
-  else()	
-    if (PYTHON_VERSION_MAJOR EQUAL 3)
-        FIND_PACKAGE(Boost COMPONENTS python${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR})
-        FIND_PACKAGE(PythonInterp 3)
-        FIND_PACKAGE(PythonLibs 3 REQUIRED)
-    else()
-        FIND_PACKAGE(Boost COMPONENTS python${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR})
-        FIND_PACKAGE(PythonInterp)
-        FIND_PACKAGE(PythonLibs REQUIRED)
-    endif()
-  endif()
-else()
-    message("Python not found")
-endif()
+#FIND_PACKAGE(PythonInterp)
+#
+#if (PYTHONINTERP_FOUND)
+#  if (UNIX AND NOT APPLE)
+#    if (PYTHON_VERSION_MAJOR EQUAL 3)
+#        FIND_PACKAGE(Boost COMPONENTS python${PYTHON_VERSION_SUFFIX})
+#        FIND_PACKAGE(PythonInterp 3)
+#        FIND_PACKAGE(PythonLibs 3 REQUIRED)
+#    else()
+#        FIND_PACKAGE(Boost COMPONENTS python)
+#        FIND_PACKAGE(PythonInterp)
+#        FIND_PACKAGE(PythonLibs REQUIRED)
+#    endif()
+#  else()
+#    if (PYTHON_VERSION_MAJOR EQUAL 3)
+#        FIND_PACKAGE(Boost COMPONENTS python${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR})
+#        FIND_PACKAGE(PythonInterp 3)
+#        FIND_PACKAGE(PythonLibs 3 REQUIRED)
+#    else()
+#        FIND_PACKAGE(Boost COMPONENTS python${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR})
+#        FIND_PACKAGE(PythonInterp)
+#        FIND_PACKAGE(PythonLibs REQUIRED)
+#    endif()
+#  endif()
+#else()
+#    message("Python not found")
+#endif()
 
-message(STATUS "PYTHON_LIBRARIES = ${PYTHON_LIBRARIES}")
-message(STATUS "PYTHON_EXECUTABLE = ${PYTHON_EXECUTABLE}")
-message(STATUS "PYTHON_INCLUDE_DIRS = ${PYTHON_INCLUDE_DIRS}")
-message(STATUS "Boost_LIBRARIES = ${Boost_LIBRARIES}")
+#message(STATUS "PYTHON_LIBRARIES = ${PYTHON_LIBRARIES}")
+#message(STATUS "PYTHON_EXECUTABLE = ${PYTHON_EXECUTABLE}")
+#message(STATUS "PYTHON_INCLUDE_DIRS = ${PYTHON_INCLUDE_DIRS}")
+#message(STATUS "Boost_LIBRARIES = ${Boost_LIBRARIES}")
+
+find_package(pybind11 REQUIRED)
+
+include_directories(${pybind11_INCLUDE_DIRS})
+
 
 INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS} ${PYTHON_INCLUDE_DIRS})
 LINK_LIBRARIES(${Boost_LIBRARIES} ${PYTHON_LIBRARIES}) # Deprecated but so convenient!
@@ -243,10 +248,9 @@ LINK_LIBRARIES(${Boost_LIBRARIES} ${PYTHON_LIBRARIES}) # Deprecated but so conve
 
 ###### LIBRARY NAME ######
 set(PYTHON_LIB_NAME pyclvhd)
-PYTHON_ADD_MODULE(${PYTHON_LIB_NAME}  ${LIB_SRCS})
-target_link_libraries (${PYTHON_LIB_NAME} 
-    PUBLIC ${LIB_NAME} 
-    PUBLIC LSL::lsl)
-target_include_directories(${PYTHON_LIB_NAME} 
-    PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
-
+pybind11_add_module(${PYTHON_LIB_NAME} ${LIB_SRCS})
+target_link_libraries(${PYTHON_LIB_NAME}
+        PUBLIC ${LIB_NAME}
+        PUBLIC LSL::lsl)
+target_include_directories(${PYTHON_LIB_NAME}
+        PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
