@@ -19,35 +19,44 @@ class pyDevice : public ClvHd::Device
 
     void
     setupADS1293(py::list _route_table,
-                 py::list _chx_enable,
-                 py::list _chx_high_res,
-                 py::list _chx_high_freq,
-                 py::list _R1,
-                 int R2,
-                 py::list _R3)
+                py::list _chx_enable,
+                py::list _chx_high_res,
+                py::list _chx_high_freq,
+                py::list _R1,
+                int R2,
+                py::list _R3)
     {
-        int route_table[3][2] = {{_route_table[0].cast<int>(),
-                                  _route_table[1].cast<int>()},
-                                 {_route_table[2].cast<int>(),
-                                  _route_table[3].cast<int>()},
-                                 {_route_table[4].cast<int>(),
-                                  _route_table[5].cast<int>()}};
-        bool chx_enable[3] = {_chx_enable[0].cast<bool>(),
-                              _chx_enable[1].cast<bool>(),
-                              _chx_enable[2].cast<bool>()};
-        bool chx_high_res[3] = {_chx_high_res[0].cast<bool>(),
-                                _chx_high_res[1].cast<bool>(),
-                                _chx_high_res[2].cast<bool>()};
-        bool chx_high_freq[3] = {_chx_high_freq[0].cast<bool>(),
-                                 _chx_high_freq[1].cast<bool>(),
-                                 _chx_high_freq[2].cast<bool>()};
-        int R1[3] = {_R1[0].cast<int>(), _R1[1].cast<int>(),
-                     _R1[2].cast<int>()};
-        int R3[3] = {_R3[0].cast<int>(), _R3[1].cast<int>(),
-                     _R3[2].cast<int>()};
-        ClvHd::EMG_ADS1293::setup(*this, chx_enable, route_table, chx_high_res,
-                                  chx_high_freq, R1, R2, R3);
+        // py::list から int 型の 2D 配列に変換
+        int route_table[3][2];
+        for (size_t i = 0; i < 3; ++i) {
+            py::list inner_list = _route_table[i].cast<py::list>();  // 各行をリストとしてキャスト
+            for (size_t j = 0; j < 2; ++j) {
+                route_table[i][j] = inner_list[j].cast<int>();
+            }
+        }
+
+        // py::list から bool 型の配列に変換
+        bool chx_enable[3];
+        bool chx_high_res[3];
+        bool chx_high_freq[3];
+        for (size_t i = 0; i < 3; ++i) {
+            chx_enable[i] = _chx_enable[i].cast<bool>();
+            chx_high_res[i] = _chx_high_res[i].cast<bool>();
+            chx_high_freq[i] = _chx_high_freq[i].cast<bool>();
+        }
+
+        // py::list から int 型の配列に変換
+        int R1[3];
+        int R3[3];
+        for (size_t i = 0; i < 3; ++i) {
+            R1[i] = _R1[i].cast<int>();
+            R3[i] = _R3[i].cast<int>();
+        }
+
+        // ClvHd のメソッドを呼び出す
+        ClvHd::EMG_ADS1293::setup(*this, chx_enable, route_table, chx_high_res, chx_high_freq, R1, R2, R3);
     }
+
 
     void
     start_acquisition()
