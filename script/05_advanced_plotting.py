@@ -92,6 +92,11 @@ class ChannelControlWindow(QtWidgets.QWidget):
             clvhd.setRGB(0, 0, [0, 0, 0])
         return handler
 
+    def closeEvent(self, event):
+        # When any window is closed, the entire application will exit
+        QtWidgets.QApplication.instance().quit()
+        event.accept()
+
 class ScaleWindow(QtWidgets.QWidget):
     scale_changed = QtCore.Signal(float)
     offset_changed = QtCore.Signal(float)
@@ -103,33 +108,38 @@ class ScaleWindow(QtWidgets.QWidget):
 
         layout = QtWidgets.QVBoxLayout()
 
+        # Y-scale selection
         self.scale_label = QtWidgets.QLabel("Y-axis scale:")
-        self.scale_slider = QtWidgets.QSlider(QtCore.Qt.Vertical)
-        self.scale_slider.setMinimum(1)  # Set the minimum as 1 (equivalent to 0.01)
-        self.scale_slider.setMaximum(1000)  # Set the maximum as 1000 (equivalent to 10.0)
-        self.scale_slider.setValue(100)  # Set the default value to 100 (equivalent to 1.0)
-        self.scale_slider.valueChanged.connect(self.scale_slider_changed)
-
-        self.offset_label = QtWidgets.QLabel("Y-axis offset:")
-        self.offset_slider = QtWidgets.QSlider(QtCore.Qt.Vertical)
-        self.offset_slider.setMinimum(-50)
-        self.offset_slider.setMaximum(50)
-        self.offset_slider.setValue(0)
-        self.offset_slider.valueChanged.connect(self.offset_slider_changed)
-
+        self.scale_combo = QtWidgets.QComboBox()
+        self.scale_combo.addItems(["0.1", "0.5", "1", "2"])  # Add scale options
+        self.scale_combo.currentIndexChanged.connect(self.scale_changed_handler)
         layout.addWidget(self.scale_label)
-        layout.addWidget(self.scale_slider)
+        layout.addWidget(self.scale_combo)
+
+        # Y-offset selection
+        self.offset_label = QtWidgets.QLabel("Y-axis offset:")
+        self.offset_combo = QtWidgets.QComboBox()
+        self.offset_combo.addItems(["-0.5", "0", "0.5"])  # Add offset options
+        self.offset_combo.currentIndexChanged.connect(self.offset_changed_handler)
         layout.addWidget(self.offset_label)
-        layout.addWidget(self.offset_slider)
+        layout.addWidget(self.offset_combo)
 
         self.setLayout(layout)
 
-    def scale_slider_changed(self, value):
-        scale_value = value / 100.0
+    def scale_changed_handler(self, index):
+        # Get the selected scale value and emit it as a float
+        scale_value = float(self.scale_combo.currentText())
         self.scale_changed.emit(scale_value)
 
-    def offset_slider_changed(self, value):
-        self.offset_changed.emit(value)
+    def offset_changed_handler(self, index):
+        # Get the selected offset value and emit it as a float
+        offset_value = float(self.offset_combo.currentText())
+        self.offset_changed.emit(offset_value)
+
+    def closeEvent(self, event):
+        # When any window is closed, the entire application will exit
+        QtWidgets.QApplication.instance().quit()
+        event.accept()
 
 
 class RealTimePlot(QtWidgets.QMainWindow):
@@ -199,6 +209,11 @@ class RealTimePlot(QtWidgets.QMainWindow):
     def set_channel_visibility(self, channel_index, is_visible):
         self.curve_visibility[channel_index] = is_visible
         self.curves[channel_index].setVisible(is_visible)
+
+    def closeEvent(self, event):
+        # When any window is closed, the entire application will exit
+        QtWidgets.QApplication.instance().quit()
+        event.accept()
 
 
 def main():
