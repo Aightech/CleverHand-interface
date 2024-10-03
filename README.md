@@ -207,6 +207,7 @@ To create a new module type, follow these steps:
 - CMake
 - Make
 - build-essential
+- [liblsl](https://github.com/sccn/liblsl)
 
 ### Building
 ```bash
@@ -219,6 +220,7 @@ make
 ## Windows
 ### Requirements
 - CMake
+- [liblsl](https://github.com/sccn/liblsl)
 
 ### Building     
 ```bash
