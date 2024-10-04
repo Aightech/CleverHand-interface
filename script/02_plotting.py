@@ -7,8 +7,7 @@ import time
 from collections import deque
 
 # Parameters
-buffer_size = 600  # Maximum number of samples to store
-fs = 500  # Sampling rate in Hz
+buffer_size = 5000  # （500Hz * 10 sec ）
 
 verbosity = 3  # Amount of information to print in the console (0: no information)
 path_dev = "/dev/ttyACM0"  # Path to the serial port
@@ -18,7 +17,7 @@ nb = clvhd.setup()  # Setup the device (returns the number of modules connected)
 
 # ADS1293 configuration
 route_table = [[1, 2], [3, 4], [5, 6]]  # Pair of channels to route the ADCs to
-chx_enable = [True, False, True]
+chx_enable = [True, True, True]
 chx_high_res = [True, True, True]
 chx_high_freq = [True, True, True]
 R1 = [2, 2, 2]
@@ -50,15 +49,17 @@ class RealTimePlot(QtWidgets.QMainWindow):
             plot = self.graphWidget.addPlot(row=i, col=0, title=f'Module {i+1}')
             plot.setYRange(-1, 1)
             plot.setXRange(0, self.time_window)  # Set the X range to 10 seconds
+            plot.setLabel('left', 'mV')  # Add "mV" label on the left side
             self.plots.append(plot)
+            colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255)]  # Set colors for 3 channels
             for j in range(3):
-                curve = plot.plot(pen=pg.mkPen((j * 100, 200, 200), width=2), name=f'Channel {j+1}')
+                curve = plot.plot(pen=pg.mkPen(colors[j], width=2), name=f'Channel {j+1}')
                 self.curves.append(curve)
 
         # Timer to update the plot
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.update_plot)
-        self.timer.start(50)  # Update every 50 ms
+        self.timer.start(2)  # Update every 2 ms, equivalent to 500 Hz
 
     def update_plot(self):
         # Read data from the device
@@ -66,7 +67,7 @@ class RealTimePlot(QtWidgets.QMainWindow):
         ts_buffer.append(ts / 1e6)  # Convert timestamp to seconds
         for i in range(nb):
             for j in range(3):
-                data_buffer[3 * i + j].append(precise[i][j])
+                data_buffer[3 * i + j].append(precise[i][j]*1e3)
 
         # Update the curves
         ts_buffer_copy = np.array(ts_buffer)

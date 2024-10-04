@@ -6,11 +6,10 @@ import sys
 from collections import deque
 
 # Parameters
-buffer_size = 600  # Maximum number of samples to store
-fs = 500  # Sampling rate in Hz
+buffer_size = 5000  # （500Hz * 10 sec ）
 
 verbosity = 3  # Amount of information to print in the console (0: no information)
-path_dev = "/dev/tty.usbmodem145149601"  # Path to the serial port
+path_dev = "/dev/ttyACM0"  # Path to the serial port
 clvhd = pyclvhd.Device(verbosity)  # Create a cleverHand device
 clvhd.open_connection(path=path_dev)  # Open a connection to the device
 nb = clvhd.setup()  # Setup the device (returns the number of modules connected)
@@ -45,36 +44,38 @@ class ChannelControlWindow(QtWidgets.QWidget):
         self.checkboxes = []
 
         for device_idx in range(nb):  # Loop over each device
+            # Add a horizontal layout for device label and RGB button
+            device_layout = QtWidgets.QHBoxLayout()
+
             # Add a label for each device
             device_label = QtWidgets.QLabel(f"Device {device_idx + 1}")
-            layout.addWidget(device_label)
+            device_layout.addWidget(device_label)
+
+            # Add RGB button next to the device label
+            button = QtWidgets.QPushButton(f"Set RGB")
+            button.clicked.connect(self.create_button_clicked_handler(device_idx))  # Bind to the specific device
+            device_layout.addWidget(button)
+
+            # Add device layout (label and button) to the main layout
+            layout.addLayout(device_layout)
+
+            # Add checkboxes for each channel of the device (horizontally)
+            hbox = QtWidgets.QHBoxLayout()
+            for ch_idx in range(3):  # Each device has 3 channels
+                channel_index = device_idx * 3 + ch_idx
+                checkbox = QtWidgets.QCheckBox(f"Ch {channel_index + 1}")
+                checkbox.setChecked(True)  # All channels visible by default
+                checkbox.stateChanged.connect(self.checkbox_state_changed)
+                hbox.addWidget(checkbox)
+                self.checkboxes.append(checkbox)
+
+            layout.addLayout(hbox)
 
             # Add a horizontal line to separate devices
             line = QtWidgets.QFrame()
             line.setFrameShape(QtWidgets.QFrame.HLine)
             line.setFrameShadow(QtWidgets.QFrame.Sunken)
             layout.addWidget(line)
-
-            # Add checkboxes and buttons for each channel of the device
-            for ch_idx in range(3):  # Each device has 3 channels
-                hbox = QtWidgets.QHBoxLayout()
-
-                # Create a checkbox for controlling visibility
-                channel_index = device_idx * 3 + ch_idx
-                checkbox = QtWidgets.QCheckBox(f"Channel {channel_index + 1}")
-                checkbox.setChecked(True)  # All channels visible by default
-                checkbox.stateChanged.connect(self.checkbox_state_changed)
-                hbox.addWidget(checkbox)
-
-                # Create a button for triggering clvhd.setRGB
-                button = QtWidgets.QPushButton("Set RGB")
-                button.clicked.connect(self.create_button_clicked_handler(channel_index))  # Bind to the specific channel
-                hbox.addWidget(button)
-
-                # Add the horizontal layout to the main layout
-                layout.addLayout(hbox)
-
-                self.checkboxes.append(checkbox)
 
         self.setLayout(layout)
 
@@ -85,17 +86,18 @@ class ChannelControlWindow(QtWidgets.QWidget):
         # Emit signal with the channel index and its visibility state
         self.channel_visibility_changed.emit(channel_index, is_checked)
 
-    def create_button_clicked_handler(self, channel_index):
+    def create_button_clicked_handler(self, device_idx):
         def handler():
-            # When the button is clicked, call clvhd.setRGB with hardcoded values
-            print(f"Button clicked for Channel {channel_index + 1}")
-            clvhd.setRGB(0, 0, [0, 0, 0])
+            # When the button is clicked, call clvhd.setRGB for the device
+            print(f"Set RGB for Device {device_idx + 1}")
+            clvhd.setRGB(device_idx, 0, [0, 0, 0])
         return handler
 
     def closeEvent(self, event):
         # When any window is closed, the entire application will exit
         QtWidgets.QApplication.instance().quit()
         event.accept()
+
 
 class ScaleWindow(QtWidgets.QWidget):
     scale_changed = QtCore.Signal(float)
@@ -172,7 +174,7 @@ class RealTimePlot(QtWidgets.QMainWindow):
         # Timer to update the plot
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.update_plot)
-        self.timer.start(50)  # Update every 50 ms
+        self.timer.start(2)  # Update every 2 ms, equivalent to 500 Hz
 
     def update_plot(self):
         # Read data from the device
@@ -180,7 +182,7 @@ class RealTimePlot(QtWidgets.QMainWindow):
         ts_buffer.append(ts / 1e6)  # Convert timestamp to seconds
         for i in range(nb):
             for j in range(3):
-                data_buffer[3 * i + j].append(precise[i][j])
+                data_buffer[3 * i + j].append(precise[i][j]*1e3)
 
         # Update the curves
         ts_buffer_copy = np.array(ts_buffer)
@@ -231,13 +233,23 @@ def main():
     channel_control_window = ChannelControlWindow()
     channel_control_window.channel_visibility_changed.connect(window.set_channel_visibility)
 
-    # Show all windows
+    # Show main window
     window.show()
+
+    # Set positions and sizes of the side windows (scale and channel control)
+    window_x, window_y, window_width, window_height = window.geometry().getRect()
+
+    # Adjust scale window (left side)
+    # scale_window.setGeometry(window_x - 200, window_y, 200, window_height)
     scale_window.show()
+    scale_window.move(window_x - scale_window.frameGeometry().width(), window_y)
+
+    # Adjust channel control window (right side)
+    # channel_control_window.setGeometry(window_x + window_width, window_y, 200, window_height)
     channel_control_window.show()
+    channel_control_window.move(window_x + window_width, window_y)
 
     sys.exit(app.exec_())
-
 
 if __name__ == "__main__":
     main()
