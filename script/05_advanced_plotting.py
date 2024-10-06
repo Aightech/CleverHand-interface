@@ -80,9 +80,10 @@ class ChannelControlWindow(QtWidgets.QWidget):
         self.setLayout(layout)
 
     def checkbox_state_changed(self, state):
+        
         sender = self.sender()
         channel_index = self.checkboxes.index(sender)
-        is_checked = state == QtCore.Qt.Checked
+        is_checked = sender.isChecked()
         # Emit signal with the channel index and its visibility state
         self.channel_visibility_changed.emit(channel_index, is_checked)
 
