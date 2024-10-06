@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1...3.3)
+cmake_minimum_required(VERSION 3.3...3.3)
 ###### Author: Alexis Devillard
 ###### Date:   25/05/2022
 ###### Brief: This CmakeLists.txt file enable to build generic project with the following structure:
@@ -51,17 +51,19 @@ cmake_minimum_required(VERSION 3.1...3.3)
 ######                                    │  ┌───────────────┐
 ######                                    └──┤ subproject ...│
 ######                                       └───────────────┘
-				   
+
 ########### PROJECT NAME AND VERSION ######
 include(CMakeConfig.txt)
 project(${EXEC_NAME} VERSION ${PROJECT_VERSION})
+option(BUILD_EXAMPLES "Build examples" OFF)
+option(BUILD_PYTHON "Build python wrapper" OFF)
 
 ###### LIBRARY NAME ######
 set(LIB_NAME ${EXEC_NAME}.${PROJECT_VERSION})
- 
+
 if(NOT DEFINED DIR_DEPTH)
   set(DIR_DEPTH 0)
-else ()
+else()
   MATH(EXPR DIR_DEPTH "${DIR_DEPTH}+1")
 endif()
 string(REPEAT "\t" ${DIR_DEPTH} PREFIX_MSG)
@@ -71,21 +73,24 @@ MATH(EXPR color_code2 "${DIR_DEPTH}+34")
 ###### include helper functions ######
 include(CMakeFunctions.txt)
 
-if (TARGET ${EXEC_NAME})
+if(TARGET ${EXEC_NAME})
   # Do something when target found
   message("${PREFIX_MSG}-- ${ColourBold}${Esc}[${color_code}m${EXEC_NAME}${ColourReset} is already built")
-elseif (TARGET ${LIB_NAME})
+elseif(TARGET ${LIB_NAME})
   message("${PREFIX_MSG}-- ${ColourBold}${Esc}[${color_code}m${LIB_NAME}${ColourReset} is already built")
-else ()
+else()
 
   ###### C++ standard ######
   set(CMAKE_CXX_STANDARD 11)
   set(CMAKE_CXX_STANDARD_REQUIRED True)
-  
+  #display the compiler user and its version
+  message("${PREFIX_MSG}-- ${ColourBold}${Esc}[${color_code}m${EXEC_NAME}${ColourReset}: Compiler: ${ColourBold}${CMAKE_CXX_COMPILER_ID}${ColourReset} ${CMAKE_CXX_COMPILER_VERSION}")
+  execute_process(COMMAND ${CMAKE_CXX_COMPILER} --version OUTPUT_VARIABLE COMPILER_VERSION)
+
 
   ###### Get the sources and headers ######
   ###### Exec main src file ######
-  file(GLOB MAIN_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/main*") 
+  file(GLOB MAIN_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/main*")
   ###### Exec-only header file ######
   set(EXTRA_HEADERS "include/gnuplot-iostream.h")
 
@@ -100,11 +105,11 @@ else ()
   if(NOT DEFINED NO_CONNECTION)
     execute_process(COMMAND printf "-- Check internet connection: ${ColourSlowBlink}${Yellow}...${ColourReset}\\b\\b\\b")
     execute_process(
-      COMMAND ping www.google.com -c 2 -w 1 
+      COMMAND ping www.google.com -c 2 -w 1
       ERROR_QUIET
       OUTPUT_QUIET
       RESULT_VARIABLE NO_CONNECTION
-      )
+    )
     if(NO_CONNECTION EQUAL 1)
       message(" ${Green}Online${ColourReset}")
     else()
@@ -113,12 +118,8 @@ else ()
   endif()
 
 
-  ###### Search for LSL ######
-  find_package(LSL REQUIRED HINTS ${LSL_DIR})
-
-
   ###### Search for Subdirectories/Libraries ######
-  if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib")
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib")
     execute_process(COMMAND git submodule status
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
       OUTPUT_VARIABLE SUBMODULES_LIST)
@@ -135,122 +136,135 @@ else ()
       if(IS_UNUSED EQUAL 1)
         message("${PREFIX_MSG}-- ${ColourBold}${Esc}[${color_code}m${EXEC_NAME}${ColourReset}: ${ColourBold}${Esc}[${color_code2}m${subdir}${ColourReset} is an unused library")
         continue()
-      endif()  
+      endif()
 
       string(FIND "${SUBMODULES_LIST}" "${subdir}" FOUND)
-      if(${FOUND} GREATER -1 AND NO_CONNECTION EQUAL 1 )
+      if(${FOUND} GREATER -1 AND NO_CONNECTION EQUAL 1)
         #git submodules init
         execute_process(COMMAND git submodule update --remote --merge --init -- "lib/${subdir}"
           WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} OUTPUT_VARIABLE OUTPUT)
       endif()
-      subproject_version("lib/${subdir}" subdir_version)#get the version
+      subproject_version("lib/${subdir}" subdir_version) #get the version
       message("${PREFIX_MSG}-- ${ColourBold}${Esc}[${color_code}m${EXEC_NAME}${ColourReset}: Adding library ${ColourBold}${Esc}[${color_code2}m${subdir}${ColourReset} version: ${ColourBold}${subdir_version}${ColourReset}")
       add_subdirectory("lib/${subdir}")
-      
-      get_directory_property(libname 
-      DIRECTORY "lib/${subdir}"
-	    DEFINITION LIB_NAME)
+
+      get_directory_property(libname
+        DIRECTORY "lib/${subdir}"
+        DEFINITION LIB_NAME)
       list(APPEND EXTRA_LIBS "${libname}")
-      link_directories(${CMAKE_SOURCE_DIR}/lib/${subdir}/bin)    
+      link_directories(${CMAKE_SOURCE_DIR}/lib/${subdir}/bin)
     endforeach()
   endif()
 
+  ###### Search for Subdirectories/Libraries ######
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tool_lib" AND BUILD_EXAMPLES AND DIR_DEPTH EQUAL 0)
+    execute_process(COMMAND git submodule status
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+      OUTPUT_VARIABLE SUBMODULES_LIST)
+    subdirlist(LIBS "${CMAKE_CURRENT_SOURCE_DIR}/tool_lib/")
+    foreach(subdir ${LIBS})
+      #check if the library is a unused library
+      set(IS_UNUSED 0)
+      foreach(lib ${UNUSED_LIBS})
+        string(FIND "${lib}" "${subdir}" FOUND)
+        if(${FOUND} GREATER -1)
+          set(IS_UNUSED 1)
+        endif()
+      endforeach()
+      if(IS_UNUSED EQUAL 1)
+        message("${PREFIX_MSG}-- ${ColourBold}${Esc}[${color_code}m${EXEC_NAME}${ColourReset}: ${ColourBold}${Esc}[${color_code2}m${subdir}${ColourReset} is an unused library")
+        continue()
+      endif()
+
+      string(FIND "${SUBMODULES_LIST}" "${subdir}" FOUND)
+      if(${FOUND} GREATER -1 AND NO_CONNECTION EQUAL 1)
+        #git submodules init
+        execute_process(COMMAND git submodule update --remote --merge --init -- "tool_lib/${subdir}"
+          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} OUTPUT_VARIABLE OUTPUT)
+      endif()
+      subproject_version("tool_lib/${subdir}" subdir_version) #get the version
+      message("${PREFIX_MSG}-- ${ColourBold}${Esc}[${color_code}m${EXEC_NAME}${ColourReset}: Adding ${ColourBold}tool${ColourReset} library ${ColourBold}${Esc}[${color_code2}m${subdir}${ColourReset} version: ${ColourBold}${subdir_version}${ColourReset}")
+      add_subdirectory("tool_lib/${subdir}")
+
+      get_directory_property(libname
+        DIRECTORY "tool_lib/${subdir}"
+        DEFINITION LIB_NAME)
+      list(APPEND TOOL_LIBS "${libname}")
+      link_directories(${CMAKE_SOURCE_DIR}/tool_lib/${subdir}/bin)
+    endforeach()
+  endif()
+
+  #create the list of sources for the python wrapper
+  set(LIB_SRCS_PY ${LIB_SRCS})
+
+  #remove the python files from the list
+  list(FILTER LIB_SRCS EXCLUDE REGEX ".*py.*")
+
 
   ###### Create the library ######
-  add_library(${LIB_NAME} ${LIB_SRCS})
-  target_link_libraries (${LIB_NAME}
+  add_library(${LIB_NAME} SHARED ${LIB_SRCS})
+  target_link_libraries(${LIB_NAME}
     PUBLIC ${EXTRA_LIBS})
   target_include_directories(${LIB_NAME}
     PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include"
-    )
+  )
 
+  if(BUILD_PYTHON)
+    #check if pybind11 submodule is initialized/updated (if the folder is empty)
+    # Add pybind11 subdirectory
+    add_subdirectory(extern/pybind11)
+    include_directories(${pybind11_INCLUDE_DIRS})
 
+    # Find Python 3 libraries and development headers
+    find_package(Python3 REQUIRED COMPONENTS Development)
 
-  ###### Create the executable ######
-  #for each main file
-  foreach(MAIN_FILE ${MAIN_FILES})
-    #the name of the executable is the name of the project + the main file (without the "main" and extension)
-    get_filename_component(EXEC_NAME ${MAIN_FILE} NAME_WE)
-    #replace main with the project name
-    string(REPLACE "main" ${PROJECT_NAME} EXEC_NAME ${EXEC_NAME})
-    message("${PREFIX_MSG}-- ${ColourBold}${Esc}[${color_code}m${EXEC_NAME}${ColourReset} will be built")
-    add_executable(${EXEC_NAME} ${MAIN_FILE})
-    target_link_libraries (${EXEC_NAME}
+    #test if the python is found
+    if(NOT Python3_FOUND)
+      message(FATAL_ERROR "Python 3 is required to build the python wrapper")
+    endif()
+    ###### LIBRARY NAME ######
+    set(PYTHON_LIB_NAME pyclvhd)
+
+    # Add pybind11 module
+    pybind11_add_module(${PYTHON_LIB_NAME} ${LIB_SRCS_PY})
+
+    # Link the necessary libraries
+    target_link_libraries(${PYTHON_LIB_NAME}
       PUBLIC ${LIB_NAME}
-      PUBLIC LSL::lsl)
-    target_include_directories(${EXEC_NAME}
-      PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
-    
-  endforeach()
+      PRIVATE Python3::Python
+    )
+    target_include_directories(${PYTHON_LIB_NAME} # 
+      PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    #copy the resulting .so file to the script folder
+    add_custom_command(TARGET ${PYTHON_LIB_NAME} POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${PYTHON_LIB_NAME}> ${CMAKE_CURRENT_SOURCE_DIR}/script/${PYTHON_LIB_NAME}.so
+      #add so in bin/ with os specific name
+      COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${PYTHON_LIB_NAME}> ${CMAKE_CURRENT_SOURCE_DIR}/bin/
+      COMMAND ${CMAKE_COMMAND} -E echo "       Python wrapper built in ${CMAKE_CURRENT_SOURCE_DIR}/scripts/"
+    )
+  endif()
 
 
-  ###### Instalation rule ######
-  install(TARGETS ${EXEC_NAME} DESTINATION bin)
-  install(TARGETS ${LIB_NAME} DESTINATION bin)
-  install(FILES ${HEADERS} DESTINATION include)
-
-
+  ###### Create the executable only if examples are enabled and buildind from the root ######
+  if(BUILD_EXAMPLES AND DIR_DEPTH EQUAL 0)
+    #for each main file
+    foreach(MAIN_FILE ${MAIN_FILES})
+      #the name of the executable is the name of the project + the main file (without the "main" and extension)
+      get_filename_component(EXEC_NAME ${MAIN_FILE} NAME_WE)
+      #replace main with the project name
+      string(REPLACE "main" ${PROJECT_NAME} EXEC_NAME ${EXEC_NAME})
+      message("${PREFIX_MSG}-- ${ColourBold}${Esc}[${color_code}m${EXEC_NAME}${ColourReset} will be built")
+      add_executable(${EXEC_NAME} ${MAIN_FILE})
+      target_link_libraries(${EXEC_NAME}
+        PUBLIC ${LIB_NAME}
+        PUBLIC ${TOOL_LIBS})
+      target_include_directories(${EXEC_NAME}
+        PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    endforeach()
+  endif()
 
 endif()
-# enable_testing()
-# # define a function to simplify adding tests
-# function(do_test target arg result)
-#   add_test(NAME Comp${arg} COMMAND ${target} ${arg})
-#   set_tests_properties(Comp${arg}
-#     PROPERTIES PASS_REGULAR_EXPRESSION ${result}
-#     )
-# endfunction(do_test)
-# # do a bunch of result based tests
-# do_test(canopen 1 1000 0 "")
-# do_test(canopen 2 607A 0 4 d 1000 "")
-
-#FIND_PACKAGE(PythonInterp)
-#
-#if (PYTHONINTERP_FOUND)
-#  if (UNIX AND NOT APPLE)
-#    if (PYTHON_VERSION_MAJOR EQUAL 3)
-#        FIND_PACKAGE(Boost COMPONENTS python${PYTHON_VERSION_SUFFIX})
-#        FIND_PACKAGE(PythonInterp 3)
-#        FIND_PACKAGE(PythonLibs 3 REQUIRED)
-#    else()
-#        FIND_PACKAGE(Boost COMPONENTS python)
-#        FIND_PACKAGE(PythonInterp)
-#        FIND_PACKAGE(PythonLibs REQUIRED)
-#    endif()
-#  else()
-#    if (PYTHON_VERSION_MAJOR EQUAL 3)
-#        FIND_PACKAGE(Boost COMPONENTS python${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR})
-#        FIND_PACKAGE(PythonInterp 3)
-#        FIND_PACKAGE(PythonLibs 3 REQUIRED)
-#    else()
-#        FIND_PACKAGE(Boost COMPONENTS python${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR})
-#        FIND_PACKAGE(PythonInterp)
-#        FIND_PACKAGE(PythonLibs REQUIRED)
-#    endif()
-#  endif()
-#else()
-#    message("Python not found")
-#endif()
-
-#message(STATUS "PYTHON_LIBRARIES = ${PYTHON_LIBRARIES}")
-#message(STATUS "PYTHON_EXECUTABLE = ${PYTHON_EXECUTABLE}")
-#message(STATUS "PYTHON_INCLUDE_DIRS = ${PYTHON_INCLUDE_DIRS}")
-#message(STATUS "Boost_LIBRARIES = ${Boost_LIBRARIES}")
-
-add_subdirectory(extern/pybind11)
-
-include_directories(${pybind11_INCLUDE_DIRS})
 
 
-# INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS} ${PYTHON_INCLUDE_DIRS})
-# LINK_LIBRARIES(${Boost_LIBRARIES} ${PYTHON_LIBRARIES}) # Deprecated but so convenient!
 
-
-###### LIBRARY NAME ######
-set(PYTHON_LIB_NAME pyclvhd)
-pybind11_add_module(${PYTHON_LIB_NAME} ${LIB_SRCS})
-target_link_libraries(${PYTHON_LIB_NAME}
-        PUBLIC ${LIB_NAME}
-        PUBLIC LSL::lsl)
-target_include_directories(${PYTHON_LIB_NAME}
-        PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
