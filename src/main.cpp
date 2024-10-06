@@ -4,17 +4,35 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+void
+usage(char *name)
+{
+    std::cerr << "Usage: " << name << " <serial_port>" << std::endl;
+}
+
 int
 main(int argc, char *argv[])
 {
+    std::string port;
+    //default port
+#if defined(__linux__)
+    port = "/dev/ttyACM0";
+#elif defined(__APPLE__)
+    port = "/dev/tty.usbmodem145149601";
+#elif defined(_WIN32)
+    port = "COM3";
+#endif
+
+    if(argc == 2)
+        port = argv[1];
+    
     std::cout << "CleverHand Serial Interface:" << std::endl;
     try
     {
         ClvHd::Device device(3);
 
         //open the serial connection between the computer and the controller board
-        device.controller.open_connection("/dev/ttyACM0", 500000,
-                                          O_RDWR | O_NOCTTY);
+        device.controller.open_connection(port.c_str()  , 500000, O_RDWR | O_NOCTTY);
         usleep(500000);
 
         //setup the device (count and find the type of modules attached)
@@ -78,7 +96,9 @@ main(int argc, char *argv[])
     catch(std::string str)
     {
         std::cerr << "[ERROR] Got an exception: " << str << std::endl;
+        usage(argv[0]);
     }
+    
 
     return 0; // success
 }

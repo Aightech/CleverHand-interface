@@ -202,30 +202,18 @@ To create a new module type, follow these steps:
 
 
 ## Building the library
-### Linux
 ### Requirements
 - CMake
 - Make
 - build-essential
+- (optional: [liblsl](https://github.com/sccn/liblsl))
 
 ### Building
 ```bash
 mkdir build
 cd build
-cmake ..
+cmake .. -DBUILD_EXAMPLES=ON -DBUILD_PYTHON=ON
 make
-```
-
-## Windows
-### Requirements
-- CMake
-
-### Building     
-```bash
-mkdir build
-cd build
-cmake ..
-cmake --build .
 ```
 
 
