@@ -9,3 +9,7 @@
 [submodule "extern/pybind11"]
 	path = extern/pybind11
 	url = https://github.com/pybind/pybind11.git
+[submodule "tool_lib/built_lsl"]
+	path = tool_lib/built_lsl
+	url = ../built_lsl
+	branch = main
