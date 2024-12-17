@@ -235,7 +235,7 @@ class Controller : public Communication::Serial
         sendCmd(arr, 3);
         uint8_t ans[3];
         if(readReply(ans) == 3)
-            return ans[0] == ans[0] && ans[1] == arr[1] && ans[2] == arr[2];
+            return ans[0] == arr[0] && ans[1] == arr[1] && ans[2] == arr[2];
         else
             return false;
     };
