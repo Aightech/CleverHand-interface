@@ -98,6 +98,7 @@ class Controller : public Communication::Serial
             if(timestamp != nullptr)
                 *timestamp = *(uint64_t *)m_buffer;
             n = this->readS(buff, m_buffer[8]);
+            // printf("n: %d \t size: %d\n", n, m_buffer[8]);
             return n;
         }
         else

@@ -252,7 +252,7 @@ class EMG_ADS1293 : public Module, virtual public ESC::CLI
                     s_cli.log(ESC::fstr("OK\n", {ESC::FG_GREEN, ESC::BOLD}));
                     //set the i-th bit to 1 to indicate that the module has the class type
                     modules_mask |= mask;
-                    nb_modules++;
+                    EMG_ADS1293::nb_modules++;
                     EMG_ADS1293 *emg =
                         new EMG_ADS1293(&device.controller, i, verbose);
                     device.modules[i] = emg;

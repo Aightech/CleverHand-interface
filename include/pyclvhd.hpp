@@ -26,16 +26,14 @@ class pyDevice : public ClvHd::Device
                 int R2,
                 py::list _R3)
     {
-        // py::list から int 型の 2D 配列に変換
         int route_table[3][2];
         for (size_t i = 0; i < 3; ++i) {
-            py::list inner_list = _route_table[i].cast<py::list>();  // 各行をリストとしてキャスト
+            py::list inner_list = _route_table[i].cast<py::list>();  
             for (size_t j = 0; j < 2; ++j) {
                 route_table[i][j] = inner_list[j].cast<int>();
             }
         }
 
-        // py::list から bool 型の配列に変換
         bool chx_enable[3];
         bool chx_high_res[3];
         bool chx_high_freq[3];
@@ -45,7 +43,6 @@ class pyDevice : public ClvHd::Device
             chx_high_freq[i] = _chx_high_freq[i].cast<bool>();
         }
 
-        // py::list から int 型の配列に変換
         int R1[3];
         int R3[3];
         for (size_t i = 0; i < 3; ++i) {
@@ -53,8 +50,8 @@ class pyDevice : public ClvHd::Device
             R3[i] = _R3[i].cast<int>();
         }
 
-        // ClvHd のメソッドを呼び出す
         ClvHd::EMG_ADS1293::setup(*this, chx_enable, route_table, chx_high_res, chx_high_freq, R1, R2, R3);
+        
     }
 
 
@@ -67,16 +64,16 @@ class pyDevice : public ClvHd::Device
     py::tuple
     read_all()
     {
-        int nb_modules = 0;
-        nb_modules = ClvHd::EMG_ADS1293::nb_modules;
-        double fast[nb_modules * 3];
-        double precise[nb_modules * 3];
-        uint8_t flags[nb_modules];
+        int nb_modules = ClvHd::EMG_ADS1293::nb_modules;
+        printf("nb_modules: %d\n", nb_modules);
+        double fast[ClvHd::EMG_ADS1293::nb_modules * 3];
+        double precise[ClvHd::EMG_ADS1293::nb_modules * 3];
+        uint8_t flags[ClvHd::EMG_ADS1293::nb_modules];
         uint64_t timestamp =
             ClvHd::EMG_ADS1293::read_all(*this, fast, precise, flags);
         py::list fast_list;
         py::list precise_list;
-        for(int i = 0; i < nb_modules; i++)
+        for(int i = 0; i < ClvHd::EMG_ADS1293::nb_modules; i++)
         {
             py::list fast_ch;
             py::list precise_ch;
