@@ -4,10 +4,10 @@ import numpy as np
 import pyclvhd
 import sys
 from collections import deque
+from scipy.signal import butter, lfilter
 
 # Parameters
-buffer_size = 5000  # （500Hz * 10 sec ）
-
+buffer_size = 5000  # (500Hz * 10 sec)
 verbosity = 3  # Amount of information to print in the console (0: no information)
 path_dev = "/dev/ttyACM0"  # Path to the serial port
 clvhd = pyclvhd.Device(verbosity)  # Create a cleverHand device
@@ -28,9 +28,20 @@ clvhd.setupADS1293(route_table, chx_enable, chx_high_res, chx_high_freq, R1, R2,
 clvhd.start_acquisition()
 
 # Initialize a deque for storing data with a maximum length of BUFFER_SIZE
-data_buffer = [deque(maxlen=buffer_size) for i in range(3 * nb)]
+data_buffer = [deque(maxlen=buffer_size) for _ in range(3 * nb)]
 ts_buffer = deque(maxlen=buffer_size)
 
+# Band-pass filter configuration
+def butter_bandpass(lowcut, highcut, fs, order=4):
+    nyquist = 0.5 * fs
+    low = lowcut / nyquist
+    high = highcut / nyquist
+    b, a = butter(order, [low, high], btype='band')
+    return b, a
+
+def apply_bandpass_filter(data, lowcut, highcut, fs, order=4):
+    b, a = butter_bandpass(lowcut, highcut, fs, order=order)
+    return lfilter(b, a, data)
 
 class ChannelControlWindow(QtWidgets.QWidget):
     channel_visibility_changed = QtCore.Signal(int, bool)
@@ -80,33 +91,27 @@ class ChannelControlWindow(QtWidgets.QWidget):
         self.setLayout(layout)
 
     def checkbox_state_changed(self, state):
-        
         sender = self.sender()
         channel_index = self.checkboxes.index(sender)
         is_checked = sender.isChecked()
-        # Emit signal with the channel index and its visibility state
         self.channel_visibility_changed.emit(channel_index, is_checked)
 
     def create_button_clicked_handler(self, device_idx):
         def handler():
-            # When the button is clicked, call clvhd.setRGB for the device
             print(f"Set RGB for Device {device_idx + 1}")
             clvhd.setRGB(device_idx, 0, [0, 0, 0])
         return handler
 
     def closeEvent(self, event):
-        # When any window is closed, the entire application will exit
         QtWidgets.QApplication.instance().quit()
         event.accept()
-
 
 class ScaleWindow(QtWidgets.QWidget):
     scale_changed = QtCore.Signal(float)
     offset_changed = QtCore.Signal(float)
 
-    def __init__(self, main_window):
+    def __init__(self):
         super().__init__()
-        self.main_window = main_window  # Reference to the main window
         self.setWindowTitle("Scale & Offset Adjustment")
 
         layout = QtWidgets.QVBoxLayout()
@@ -130,124 +135,158 @@ class ScaleWindow(QtWidgets.QWidget):
         self.setLayout(layout)
 
     def scale_changed_handler(self, index):
-        # Get the selected scale value and emit it as a float
         scale_value = float(self.scale_combo.currentText())
         self.scale_changed.emit(scale_value)
 
     def offset_changed_handler(self, index):
-        # Get the selected offset value and emit it as a float
         offset_value = float(self.offset_combo.currentText())
         self.offset_changed.emit(offset_value)
 
     def closeEvent(self, event):
-        # When any window is closed, the entire application will exit
         QtWidgets.QApplication.instance().quit()
         event.accept()
 
+class FilterWindow(QtWidgets.QWidget):
+    filter_parameters_changed = QtCore.Signal(float, float)
+
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Filter Settings")
+
+        layout = QtWidgets.QVBoxLayout()
+
+        self.lowcut_label = QtWidgets.QLabel("Low Cutoff Frequency (Hz):")
+        self.lowcut_spinbox = QtWidgets.QDoubleSpinBox()
+        self.lowcut_spinbox.setRange(0.1, 250.0)
+        self.lowcut_spinbox.setValue(1.0)
+        layout.addWidget(self.lowcut_label)
+        layout.addWidget(self.lowcut_spinbox)
+
+        self.highcut_label = QtWidgets.QLabel("High Cutoff Frequency (Hz):")
+        self.highcut_spinbox = QtWidgets.QDoubleSpinBox()
+        self.highcut_spinbox.setRange(0.1, 250.0)
+        self.highcut_spinbox.setValue(50.0)
+        layout.addWidget(self.highcut_label)
+        layout.addWidget(self.highcut_spinbox)
+
+        self.apply_button = QtWidgets.QPushButton("Apply Filter")
+        self.apply_button.clicked.connect(self.apply_filter_settings)
+        layout.addWidget(self.apply_button)
+
+        self.setLayout(layout)
+
+    def apply_filter_settings(self):
+        lowcut = self.lowcut_spinbox.value()
+        highcut = self.highcut_spinbox.value()
+        self.filter_parameters_changed.emit(lowcut, highcut)
+
+    def closeEvent(self, event):
+        QtWidgets.QApplication.instance().quit()
+        event.accept()
 
 class RealTimePlot(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
 
-        # Create a pyqtgraph plot window
         self.graphWidget = pg.GraphicsLayoutWidget()
         self.setCentralWidget(self.graphWidget)
 
         self.plots = []
         self.curves = []
-        self.curve_visibility = [True] * (3 * nb)  # Store visibility of each curve
-        self.time_window = 10  # Set time window to 10 seconds
-        self.y_range = 1  # Initial Y-axis range
-        self.y_offset = 0  # Initial Y-axis offset
+        self.curve_visibility = [True] * (3 * nb)
+        self.time_window = 10
+        self.y_range = 1
+        self.y_offset = 0
+        self.lowcut = 1.0
+        self.highcut = 50.0
+        self.filter_enabled = False
 
-        # Initialize the plots for each module and channel
         for i in range(nb):
             plot = self.graphWidget.addPlot(row=i, col=0, title=f'Module {i+1}')
-            plot.setYRange(-self.y_range + self.y_offset, self.y_range + self.y_offset)  # Set initial Y range with offset
-            plot.setXRange(0, self.time_window)  # Set the X range to 10 seconds
-            plot.setLabel('left', 'mV')  # Add "mV" label on the left side
+            plot.setYRange(-self.y_range + self.y_offset, self.y_range + self.y_offset)
+            plot.setXRange(0, self.time_window)
+            plot.setLabel('left', 'mV')
             self.plots.append(plot)
-            colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255)]  # Set colors for 3 channels
+            colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255)]
             for j in range(3):
                 curve = plot.plot(pen=pg.mkPen(colors[j], width=2), name=f'Channel {j+1}')
                 self.curves.append(curve)
 
-        # Timer to update the plot
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.update_plot)
-        self.timer.start(2)  # Update every 2 ms, equivalent to 500 Hz
+        self.timer.start(2)
 
     def update_plot(self):
-        # Read data from the device
         ts, fast, precise = clvhd.read_all()
-        print("timestamp (us): ", ts)
-        ts_buffer.append(ts / 1e6)  # Convert timestamp to seconds
+        ts_buffer.append(ts / 1e6)
         for i in range(nb):
             for j in range(3):
-                data_buffer[3 * i + j].append(precise[i][j]*1e3)
+                data = precise[i][j] * 1e3
+                if self.filter_enabled:
+                    data = apply_bandpass_filter([data], self.lowcut, self.highcut, 500)[0]
+                data_buffer[3 * i + j].append(data)
 
-        # Update the curves
         ts_buffer_copy = np.array(ts_buffer)
         data_buffer_copy = np.array(data_buffer)
 
         if len(ts_buffer_copy) > 0:
             latest_time = ts_buffer_copy[-1]
-            start_time = max(0, latest_time - self.time_window)  # Keep the time window at 10 seconds
+            start_time = max(0, latest_time - self.time_window)
             for i in range(nb):
                 for j in range(3):
                     curve_index = 3 * i + j
                     if len(data_buffer_copy[curve_index]) > 0 and self.curve_visibility[curve_index]:
                         self.curves[curve_index].setData(ts_buffer_copy, data_buffer_copy[curve_index] + 0.1 * j)
-                        self.plots[i].setXRange(start_time, latest_time)  # Adjust the X range to keep data within the window
+                        self.plots[i].setXRange(start_time, latest_time)
 
     def update_y_range(self, scale_value):
         self.y_range = scale_value
         for plot in self.plots:
-            plot.setYRange(-self.y_range + self.y_offset, self.y_range + self.y_offset)  # Adjust Y range based on scale_value
+            plot.setYRange(-self.y_range + self.y_offset, self.y_range + self.y_offset)
 
     def update_y_offset(self, offset_value):
         self.y_offset = offset_value
         for plot in self.plots:
-            plot.setYRange(-self.y_range + self.y_offset, self.y_range + self.y_offset)  # Adjust Y range with offset
+            plot.setYRange(-self.y_range + self.y_offset, self.y_range + self.y_offset)
 
     def set_channel_visibility(self, channel_index, is_visible):
         self.curve_visibility[channel_index] = is_visible
         self.curves[channel_index].setVisible(is_visible)
 
+    def apply_filter(self, lowcut, highcut):
+        self.lowcut = lowcut
+        self.highcut = highcut
+        self.filter_enabled = True
+
     def closeEvent(self, event):
-        # When any window is closed, the entire application will exit
         QtWidgets.QApplication.instance().quit()
         event.accept()
-
 
 def main():
     app = QtWidgets.QApplication(sys.argv)
 
-    # Create main plot window
     window = RealTimePlot()
 
-    # Create scale and offset adjustment window
-    scale_window = ScaleWindow(main_window=window)
+    scale_window = ScaleWindow()
     scale_window.scale_changed.connect(window.update_y_range)
     scale_window.offset_changed.connect(window.update_y_offset)
 
-    # Create channel control window
+    filter_window = FilterWindow()
+    filter_window.filter_parameters_changed.connect(window.apply_filter)
+
     channel_control_window = ChannelControlWindow()
     channel_control_window.channel_visibility_changed.connect(window.set_channel_visibility)
 
-    # Show main window
     window.show()
 
-    # Set positions and sizes of the side windows (scale and channel control)
     window_x, window_y, window_width, window_height = window.geometry().getRect()
 
-    # Adjust scale window (left side)
-    # scale_window.setGeometry(window_x - 200, window_y, 200, window_height)
     scale_window.show()
     scale_window.move(window_x - scale_window.frameGeometry().width(), window_y)
 
-    # Adjust channel control window (right side)
-    # channel_control_window.setGeometry(window_x + window_width, window_y, 200, window_height)
+    filter_window.show()
+    filter_window.move(window_x, window_y + window_height)
+
     channel_control_window.show()
     channel_control_window.move(window_x + window_width, window_y)
 

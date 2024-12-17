@@ -12,8 +12,8 @@ nb = (
 
 # ADS1293 configuration
 # Each module has 3 ADC which can internally be routed to 2 of the 6 channels available on the board
-route_table = [[1, 2], [3, 4], [5, 6]]  # Pair of channels to route the ADCs to
-chx_enable = [True, False, True]  # Select which ADCs to enable
+route_table = [[3, 4], [3, 4], [5, 6]]  # Pair of channels to route the ADCs to
+chx_enable = [True, False, False]  # Select which ADCs to enable
 chx_high_res = [True, True, True]  # Select the resolution of the ADCs
 chx_high_freq = [True, True, True]  # Select low (102.8KHz) or high (204.8KHz) frequency
 # The Output Data Rate (ODR) of the ADCs can be calculated as follows:
@@ -32,13 +32,19 @@ clvhd.start_acquisition()
 
 # run for 10s
 t0 = time.time()
-while time.time() - t0 < 10:
+while time.time() - t0 < 4:
     ts, fast_list, precise_list = clvhd.read_all()  #
     print("timestamp (us): ", ts)
-    print(
-        "fast readings: ", fast_list
-    )  # list of list (nb_modules x 3) of the fast readings (nan for the readings that are not enabled or not ready)
-    print(
-        "precise readings: ", precise_list
-    )  # list of list (nb_modules x 3) of the precise readings (nan for the readings that are not enabled or not ready)
-    time.sleep(0.001)
+    # print(
+    #     "fast readings: ", fast_list
+    # )  # list of list (nb_modules x 3) of the fast readings (nan for the readings that are not enabled or not ready)
+    
+    print("v: [", end="")
+    for i in range(len(fast_list)):
+        print(fast_list[i][0], end=", ")
+    print("]")
+
+    # print(
+    #     "precise readings: ", precise_list
+    # )  # list of list (nb_modules x 3) of the precise readings (nan for the readings that are not enabled or not ready)
+    time.sleep(0.01)

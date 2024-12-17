@@ -16,7 +16,7 @@ clvhd.open_connection(path=path_dev)  # Open a connection to the device
 nb = clvhd.setup()  # Setup the device (returns the number of modules connected)
 
 # ADS1293 configuration
-route_table = [[1, 2], [3, 4], [5, 6]]  # Pair of channels to route the ADCs to
+route_table = [[3, 2], [3, 4], [5, 6]]  # Pair of channels to route the ADCs to
 chx_enable = [True, True, True]
 chx_high_res = [True, True, True]
 chx_high_freq = [True, True, True]
