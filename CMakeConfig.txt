@@ -1,5 +1,5 @@
 set(EXEC_NAME clvHd-interface)
-set(PROJECT_VERSION 5.7)
+set(PROJECT_VERSION 5.8)
 
 ###### Special libraries ######
 set(EXTRA_LIBS "")

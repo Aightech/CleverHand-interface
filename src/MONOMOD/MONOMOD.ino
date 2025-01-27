@@ -25,8 +25,14 @@ const char *password = "Df8ttktg5chw";
 //PC IP address
 const char *pc_ip = "192.168.0.15";
 const int pc_port = 5000;
+bool foundServer = false;
+String server_ip;
+int server_port;
+uint32_t dt;
 
 WiFiUDP udp;
+
+uint8_t sendBuffer[1024];
 
 void
 setRGB(
@@ -80,18 +86,18 @@ setup()
 }
 
 void
-loop()
+searchServer()
 {
-    bool foundServer = false;
-    std::string server_ip;
-    int server_port;
     while(!foundServer)
     {
-        blink(0, 255, 0, 1, 500);
+        blink(0, 255, 255, 1, 500);
+        //clear the UDP buffer
+        while(udp.parsePacket() > 0);
         udp.beginPacket("255.255.255.255", 12345); // Broadcast address
         uint8_t msg[] = "MONOMOD";
         udp.write(msg, sizeof(msg));
         udp.endPacket();
+        delay(500);
 
         int packetSize = udp.parsePacket();
         if(packetSize)
@@ -109,33 +115,54 @@ loop()
                 foundServer = true;
             }
         }
+        delay(1000);
     }
+}
+
+void
+loop()
+{
+    if(!foundServer)
+        searchServer();
     //connect to the PC
     WiFiClient client;
-    while(!client.connect(server_ip.c_str(), server_port))
+    client.connect(server_ip.c_str(), server_port);
+    PRINTLN("Connecting to the PC");
+    blink(0, 255, 0, 5, 100);
+    if(client.connected())
     {
-        PRINTLN("Connecting to PC..");
-        blink(255, 0, 255, 1, 500);
+        PRINTLN("Connected to the PC");
+        sendBuffer[0] = 'A';
+        client.write(sendBuffer, 1);
     }
-
-    // Serial.println("Connected to the PC");
-    PRINTLN("Connected to the PC");
-    int32_t dt = micros();
-    for(int i = 0; i < 100; i++)
+    while(client.connected())
     {
-        //send a message to the PC
-        dt = i;//micros();
-        client.write((char *)&dt, sizeof(dt));
-        PRINTLN("Sent: " + String(dt));
+        if(client.available())
+        {
+            uint8_t c = client.read();
+            Serial.println((int)c);
+            switch (c)
+            {
+                case 'R':
+                    blink(255, 0, 0, 1, 500);
+                    break;
+                case 'G':
+                    blink(0, 255, 0, 1, 500);
+                    break;
+                case 'B':
+                    blink(0, 0, 255, 1, 500);
+                    break;
+                case 'T':
+                    dt = micros();
+                    client.write((char *)&dt, sizeof(dt));
+                    break;
+            }
+        }
     }
-
-    //read the response from the PC
-    while(client.available() == 0) delay(1);
-    String response = client.readStringUntil('\r');
-    PRINTLN(response);
 
     //disconnect from the PC
     client.stop();
+    foundServer = false;
     PRINTLN("Disconnected from the PC");
 
     //blink the LED
