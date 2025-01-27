@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.3...3.3)
+cmake_minimum_required(VERSION 3.3...3.8)
 ###### Author: Alexis Devillard
 ###### Date:   25/05/2022
 ###### Brief: This CmakeLists.txt file enable to build generic project with the following structure:
