@@ -9,50 +9,23 @@
 #include <unordered_map>
 #include <vector>
 
-void
-callback(Communication::Server *server,
-         uint8_t *buffer,
-         size_t size,
-         void *addr,
-         void *data)
-{
-    uint16_t port = 5000;
-    std::cout << "Received: " << std::string((char *)buffer, size) << std::endl;
-    server->send_data((uint8_t *)&port, sizeof(port), addr);
-}
-
-void
-tcpcb(Communication::Server *server,
-      uint8_t *buffer,
-      size_t size,
-      void *addr,
-      void *data)
-{
-    uint16_t port = 12345;
-    std::cout << "Received TCP[" << std::dec << size << "]: ";
-    for(int i = 0; i < size; i++)
-    {
-        std::cout << std::hex << (int)buffer[i] << " ";
-    }
-    std::cout << std::endl;
-    // server->send_data((uint8_t *)&port, sizeof(port), addr);
-}
+#include "clvHdController.hpp"
 
 #define TCP_PORT 5000
 #define UDP_PORT 12345
 
-class Clvhd : virtual public ESC::CLI
+class MonoController : public ClvHd::Controller
 {
     public:
-    Clvhd(int verbose = -1)
-        : ESC::CLI(verbose, "clvhd"), serverTCP(TCP_PORT, 10, verbose),
+    MonoController(int verbose = -1)
+        : ESC::CLI(verbose, "monoclvhd"), serverTCP(TCP_PORT, 10, verbose),
           serverUDP(UDP_PORT, 10, verbose)
     {
-        logln("clvhd created", true);
+        logln("created", true);
     };
-    ~Clvhd()
+    ~MonoController()
     {
-        logln("clvhd destroyed", true);
+        logln("destroyed", true);
         serverTCP.stop();
         serverUDP.stop();
     };
@@ -61,10 +34,14 @@ class Clvhd : virtual public ESC::CLI
     stop()
     {
         serverTCP.stop();
+        std::cout << "Waiting for clients to join" << std::endl;
         serverUDP.stop();
         for(auto &client : m_clients) { client.second.join(); }
-        logln("clvhd stopped", true);
+        logln("stopped", true);
     };
+
+  
+    
 
     static void
     callbackTCP(Communication::Server *server,
@@ -74,7 +51,7 @@ class Clvhd : virtual public ESC::CLI
                 void *data)
     {
         Communication::SOCKET s = *(Communication::SOCKET *)addr;
-        Clvhd *clvhd = (Clvhd *)data;
+        MonoController *clvhd = (MonoController *)data;
         clvhd->logln("Received TCP[" + std::to_string(size) +
                          "]: " + std::string((char *)buffer, size),
                      true);
@@ -88,7 +65,7 @@ class Clvhd : virtual public ESC::CLI
                 void *data)
     {
         uint16_t port = TCP_PORT;
-        Clvhd *clvhd = (Clvhd *)data;
+        MonoController *clvhd = (MonoController *)data;
         clvhd->logln("Received UDP[" + std::to_string(size) +
                          "]: " + std::string((char *)buffer, size),
                      true);
@@ -98,7 +75,7 @@ class Clvhd : virtual public ESC::CLI
     static void
     newClient(Communication::Server *server, void *addr, Communication::SOCKET s, void *data)
     {
-        Clvhd *clvhd = (Clvhd *)data;
+        MonoController *clvhd = (MonoController *)data;
         clvhd->logln("New client", true);
         clvhd->addClient(s);
     };
@@ -106,7 +83,7 @@ class Clvhd : virtual public ESC::CLI
     void
     addClient(Communication::SOCKET s)
     {
-        m_clients[s] = std::thread(&Clvhd::clientThread, this, s);
+        m_clients[s] = std::thread(&MonoController::clientThread, this, s);
     };
 
     void
@@ -174,12 +151,16 @@ class Clvhd : virtual public ESC::CLI
     std::unordered_map<Communication::SOCKET, std::thread> m_clients;
     Communication::TCPServer serverTCP;
     Communication::UDPServer serverUDP;
+
+    
 };
+
+
 
 int
 main()
 {
-    Clvhd clvhd(4);
+    MonoController clvhd(4);
     clvhd.start();
     while(clvhd.nbClients() < 1)
     {
@@ -187,7 +168,9 @@ main()
     }
 
     std::this_thread::sleep_for(std::chrono::seconds(5));
+    std::cout << "Stop" << std::endl;
     clvhd.stop();
+
 
     return 0;
 }

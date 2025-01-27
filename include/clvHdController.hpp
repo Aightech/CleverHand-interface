@@ -70,7 +70,7 @@ class Controller : public Communication::Serial
         return sendCmd(&cmd, 1);
     };
 
-    int
+    virtual int
     sendCmd(uint8_t *data, size_t size)
     {
         if(this->writeS(data, size) != size)
@@ -88,7 +88,7 @@ class Controller : public Communication::Serial
      * @param timestamp Timestamp of the reply.
      * @return int Number of bytes read.
      */
-    int
+    virtual int
     readReply(uint8_t *buff, uint64_t *timestamp = nullptr)
     {
         // Read the timestamp and the size of the data (8 bytes + 1 byte)
