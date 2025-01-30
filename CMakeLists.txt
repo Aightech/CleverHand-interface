@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.3...3.3)
+cmake_minimum_required(VERSION 3.3...3.5)
 ###### Author: Alexis Devillard
 ###### Date:   25/05/2022
 ###### Brief: This CmakeLists.txt file enable to build generic project with the following structure:
@@ -81,7 +81,7 @@ elseif(TARGET ${LIB_NAME})
 else()
 
   ###### C++ standard ######
-  set(CMAKE_CXX_STANDARD 11)
+  set(CMAKE_CXX_STANDARD 14)
   set(CMAKE_CXX_STANDARD_REQUIRED True)
   #display the compiler user and its version
   message("${PREFIX_MSG}-- ${ColourBold}${Esc}[${color_code}m${EXEC_NAME}${ColourReset}: Compiler: ${ColourBold}${CMAKE_CXX_COMPILER_ID}${ColourReset} ${CMAKE_CXX_COMPILER_VERSION}")
@@ -198,51 +198,72 @@ else()
   set(LIB_SRCS_PY ${LIB_SRCS})
 
   #remove the python files from the list
-  list(FILTER LIB_SRCS EXCLUDE REGEX ".*py.*")
-
-
+  list(FILTER LIB_SRCS EXCLUDE REGEX "_py.*")
+  
   ###### Create the library ######
   add_library(${LIB_NAME} SHARED ${LIB_SRCS})
+  
   target_link_libraries(${LIB_NAME}
     PUBLIC ${EXTRA_LIBS})
   target_include_directories(${LIB_NAME}
-    PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   )
+  target_compile_options(${LIB_NAME} PRIVATE -Wall -Wextra -Wpedantic -Werror)
 
-  if(BUILD_PYTHON)
-    #check if pybind11 submodule is initialized/updated (if the folder is empty)
-    # Add pybind11 subdirectory
-    add_subdirectory(extern/pybind11)
-    include_directories(${pybind11_INCLUDE_DIRS})
-
-    # Find Python 3 libraries and development headers
-    find_package(Python3 REQUIRED COMPONENTS Development)
-
-    #test if the python is found
-    if(NOT Python3_FOUND)
-      message(FATAL_ERROR "Python 3 is required to build the python wrapper")
+  #check if there are _py.* files in the src folder 
+  set(IS_PYTHON 0)
+  foreach(file ${LIB_SRCS_PY})
+    string(FIND "${file}" "_py" FOUND)
+    if(${FOUND} GREATER -1)
+      set(IS_PYTHON 1)
+      message("${PREFIX_MSG}-- ${ColourBold}${Esc}[${color_code}m${EXEC_NAME}${ColourReset}: Python wrapper found: ${ColourBold}${Esc}[${Green}${file}${ColourReset}")
+      # break()
     endif()
-    ###### LIBRARY NAME ######
-    set(PYTHON_LIB_NAME pyclvhd)
+  endforeach()
 
-    # Add pybind11 module
-    pybind11_add_module(${PYTHON_LIB_NAME} ${LIB_SRCS_PY})
+  if(BUILD_PYTHON AND IS_PYTHON)
+    # check if there is an extern folder and if pybind11 is present
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/extern/pybind11")
+      #check if pybind11 submodule is initialized/updated (if the folder is empty)
+      # Add pybind11 subdirectory
+      execute_process(COMMAND git submodule update --remote --merge --init -- "extern/pybind11"
+          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} OUTPUT_VARIABLE OUTPUT)
 
-    # Link the necessary libraries
-    target_link_libraries(${PYTHON_LIB_NAME}
-      PUBLIC ${LIB_NAME}
-      PRIVATE Python3::Python
-    )
-    target_include_directories(${PYTHON_LIB_NAME} # 
-      PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include"
-    )
-    #copy the resulting .so file to the script folder
-    add_custom_command(TARGET ${PYTHON_LIB_NAME} POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${PYTHON_LIB_NAME}> ${CMAKE_CURRENT_SOURCE_DIR}/script/${PYTHON_LIB_NAME}.so
-      #add so in bin/ with os specific name
-      COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${PYTHON_LIB_NAME}> ${CMAKE_CURRENT_SOURCE_DIR}/bin/
-      COMMAND ${CMAKE_COMMAND} -E echo "       Python wrapper built in ${CMAKE_CURRENT_SOURCE_DIR}/scripts/"
-    )
+      add_subdirectory(extern/pybind11)
+      include_directories(${pybind11_INCLUDE_DIRS})
+
+      # Find Python 3 libraries and development headers
+      find_package(Python3 REQUIRED COMPONENTS Development)
+
+      #test if the python is found
+      if(NOT Python3_FOUND)
+        message(FATAL_ERROR "Python 3 is required to build the python wrapper")
+      endif()
+      ###### LIBRARY NAME ######
+      set(PYTHON_LIB_NAME pyclvhd)
+
+      # Add pybind11 module
+      pybind11_add_module(${PYTHON_LIB_NAME} ${LIB_SRCS_PY})
+
+      # Link the necessary libraries
+      target_link_libraries(${PYTHON_LIB_NAME}
+        PUBLIC ${LIB_NAME}
+        PRIVATE Python3::Python
+      )
+      target_include_directories(${PYTHON_LIB_NAME} # 
+        PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include
+      )
+      #copy the resulting .so file to the script folder
+      add_custom_command(TARGET ${PYTHON_LIB_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${PYTHON_LIB_NAME}> ${CMAKE_CURRENT_SOURCE_DIR}/script/${PYTHON_LIB_NAME}.so
+        #add so in bin/ with os specific name
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${PYTHON_LIB_NAME}> ${CMAKE_CURRENT_SOURCE_DIR}/bin/
+        COMMAND ${CMAKE_COMMAND} -E echo "       Python wrapper built in ${CMAKE_CURRENT_SOURCE_DIR}/scripts/"
+      )
+    else()
+      # say that its ok but we can't build the python wrapper
+      message("${PREFIX_MSG}-- ${ColourBold}${Esc}[${color_code}m${EXEC_NAME}${ColourReset}: ${ColourBold}${Red}pybind11${ColourReset} not found in extern folder")
+    endif()
   endif()
 
 
@@ -260,9 +281,53 @@ else()
         PUBLIC ${LIB_NAME}
         PUBLIC ${TOOL_LIBS})
       target_include_directories(${EXEC_NAME}
-        PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
+        PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
     endforeach()
   endif()
+
+
+  ###### Create package ######
+  # Install the library
+  install(TARGETS ${LIB_NAME}
+    EXPORT ${LIB_NAME} 
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+    RUNTIME DESTINATION bin
+  )
+
+  # Install the headers
+  install(DIRECTORY include/ DESTINATION include)
+
+  # Export the targets to a script
+  install(EXPORT ${LIB_NAME}
+    FILE ${EXEC_NAME}Config.cmake
+    NAMESPACE ${EXEC_NAME}::
+    DESTINATION lib/cmake/${EXEC_NAME}
+  )
+
+  include(CMakePackageConfigHelpers)
+  # Create a ConfigVersion.cmake file
+  write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/${EXEC_NAME}ConfigVersion.cmake"
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY AnyNewerVersion  # AnyNewerVersion, SameMajorVersion, SameMinorVersion, ExactVersion
+  )
+
+  # Create a Config.cmake file
+  configure_package_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/Config.cmake.in" # input file
+    "${CMAKE_CURRENT_BINARY_DIR}/${EXEC_NAME}Config.cmake" # output file
+    INSTALL_DESTINATION lib/cmake/${EXEC_NAME}
+  ) 
+
+  # Install the Config.cmake file
+  install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/${EXEC_NAME}Config.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/${EXEC_NAME}ConfigVersion.cmake"
+    DESTINATION lib/cmake/${EXEC_NAME}
+  )
+
+
 
 endif()
 

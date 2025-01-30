@@ -25,6 +25,7 @@
 !/CMakeLists.txt
 !/CMakeFunctions.txt
 !/CMakeConfig.txt
+!Config.cmake.in
 !/Doxyfile
 !/todo.org
 !/.dir-locals.el
