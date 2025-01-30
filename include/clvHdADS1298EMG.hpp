@@ -27,7 +27,11 @@ using namespace std;
 class EMG_ADS1298 : public Module, virtual public ESC::CLI
 {
     public:
-    EMG_ADS1298(Controller *controller, int id, int verbose = -1);
+    EMG_ADS1298(Controller *controller, int id, int verbose = -1)
+        : ESC::CLI(verbose, "EMG_" + std::to_string(id)) {
+        this->id = id;
+        this->m_controller = controller;
+        };
     ~EMG_ADS1298();
 
     uint8_t
@@ -40,13 +44,15 @@ class EMG_ADS1298 : public Module, virtual public ESC::CLI
     uint8_t
     RREG(uint8_t reg, uint8_t n, uint8_t *val)
     {
-        uint8_t cmd[2];// = {(0b001 | reg), n-1};
+        (void)reg;
+        uint8_t cmd[2]; // = {(0b001 | reg), n-1};
         return m_controller->readCmd(this->id, 2, cmd, n, val);
     }
 
     uint8_t
     readReg(uint8_t reg)
     {
+        (void)reg;
         uint8_t val;
         readReg(reg, 1, &val);
         return val;
@@ -54,6 +60,7 @@ class EMG_ADS1298 : public Module, virtual public ESC::CLI
     int
     readReg(uint8_t reg, int n, uint8_t *val)
     {
+        (void)reg;
         uint8_t cmd =
             reg | 0b10000000; //set the MSB to 1 to indicate a read operation
         return m_controller->readCmd(this->id, 1, &cmd, n, val);
@@ -66,12 +73,12 @@ class EMG_ADS1298 : public Module, virtual public ESC::CLI
     int
     writeReg(uint8_t reg, int n, uint8_t *val)
     {
+        (void)reg;
         uint8_t cmd =
             reg & 0b01111111; //set the MSB to 0 to indicate a write operation
         return m_controller->writeCmd(this->id, 1, &cmd, n, val);
     }
 
-    
     /**
      * @brief setup Create and setup the EMG modules in the device.
      *
@@ -93,9 +100,15 @@ class EMG_ADS1298 : public Module, virtual public ESC::CLI
           bool chx_high_freq[3] = nullptr,
           int R1[3] = nullptr,
           int R2 = -1,
-          int R3[3] = nullptr,
-          int verbose = -1)
+          int R3[3] = nullptr)
     {
+        (void)chx_enable;
+        (void)route_table;
+        (void)chx_high_res;
+        (void)chx_high_freq;
+        (void)R1;
+        (void)R2;
+        (void)R3;
         uint32_t mask = 1;
         modules_mask = 0; //reset the mask
         s_cli.set_verbose(device.controller.get_verbose());
@@ -114,13 +127,13 @@ class EMG_ADS1298 : public Module, virtual public ESC::CLI
                 uint8_t cmd = 0x11;
                 device.controller.writeCmd(i, 1, &cmd);
                 //read the register REG_ID
-                uint8_t reg_id = 0;
-                uint8_t nb=1;
+                // uint8_t reg_id = 0;
+                uint8_t nb = 1;
                 uint8_t cmd_arr[2];
-                cmd_arr[0] = 0b00100000|0x00;
-                cmd_arr[1] = nb-1;
+                cmd_arr[0] = 0b00100000 | 0x00;
+                cmd_arr[1] = nb - 1;
                 usleep(1000000);
-                int n = device.controller.readCmd(i, 2, cmd_arr, nb, &rev_id);
+                device.controller.readCmd(i, 2, cmd_arr, nb, &rev_id);
                 printf("hex %x\n", rev_id);
                 if(rev_id == 0x01) // ADS1293
                 {
@@ -147,8 +160,6 @@ class EMG_ADS1298 : public Module, virtual public ESC::CLI
         }
         return nb_modules;
     };
-
-   
 
     // each bit represent if the module has the class type
     static uint32_t modules_mask;

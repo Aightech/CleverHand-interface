@@ -42,8 +42,8 @@ class Controller : public Communication::Serial
 
     public:
     Controller(int verbose = -1)
-        : Communication::Serial(verbose),
-          ESC::CLI(verbose, "ClvHd-Controller") {};
+        : ESC::CLI(verbose, "ClvHd-Controller"),
+          Communication::Serial(verbose) {};
     ~Controller()
     {
         sendCmd('z');
@@ -53,6 +53,7 @@ class Controller : public Communication::Serial
     uint8_t
     setup(uint8_t *data = nullptr)
     {
+        (void)data;
         logln("Setup controller board", true);
         sendCmd('s');
         uint8_t nb = 0;
@@ -73,7 +74,7 @@ class Controller : public Communication::Serial
     virtual int
     sendCmd(uint8_t *data, size_t size)
     {
-        if(this->writeS(data, size) != size)
+        if((size_t)this->writeS(data, size) != size)
         {
             logln("Error sending command", true);
             return -1;
@@ -166,7 +167,11 @@ class Controller : public Communication::Serial
      * @return int Number of bytes written.
      */
     int
-    writeCmd(uint8_t id, uint8_t n_cmd, uint8_t *cmd, uint8_t size=0, const void *data=nullptr)
+    writeCmd(uint8_t id,
+             uint8_t n_cmd,
+             uint8_t *cmd,
+             uint8_t size = 0,
+             const void *data = nullptr)
     {
         return writeCmd_multi(((uint32_t)1) << id, n_cmd, cmd, size, data);
     };
@@ -185,8 +190,8 @@ class Controller : public Communication::Serial
     writeCmd_multi(uint32_t mask_id,
                    uint8_t n_cmd,
                    uint8_t *cmd,
-                   uint8_t size=0,
-                   const void *data=nullptr)
+                   uint8_t size = 0,
+                   const void *data = nullptr)
     {
         uint8_t msg[6];
         *(uint32_t *)msg = mask_id;
@@ -201,9 +206,10 @@ class Controller : public Communication::Serial
             return 0;
     };
 
-    void setRGB(uint8_t id_module, uint8_t id_led, uint8_t r, uint8_t g, uint8_t b)
+    void
+    setRGB(uint8_t id_module, uint8_t id_led, uint8_t r, uint8_t g, uint8_t b)
     {
-        uint8_t msg[6]={'i', id_module, id_led, r, g, b};
+        uint8_t msg[6] = {'i', id_module, id_led, r, g, b};
         sendCmd(msg, 6);
     };
 
@@ -231,7 +237,7 @@ class Controller : public Communication::Serial
     test_connection()
     {
         uint8_t arr[3] = {1, 2, 3};
-        int n = sendCmd('m');
+        sendCmd('m');
         sendCmd(arr, 3);
         uint8_t ans[3];
         if(readReply(ans) == 3)

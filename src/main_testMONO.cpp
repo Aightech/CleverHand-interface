@@ -70,7 +70,8 @@ class MonoController : public ClvHd::Controller
         clvhd->logln("Received UDP[" + std::to_string(size) +
                          "]: " + std::string((char *)buffer, size),
                      true);
-        server->send_data((uint8_t *)&port, sizeof(port), addr);
+        Communication::UDPServer *serverUDP = (Communication::UDPServer *)server;
+        serverUDP->send_data((uint8_t *)&port, sizeof(port), addr);
     };
 
     static void

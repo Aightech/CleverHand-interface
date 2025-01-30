@@ -303,7 +303,8 @@ class EMG_ADS1293 : public Module, virtual public ESC::CLI
              uint8_t *flags = nullptr)
     {
         uint64_t timestamp = 0;
-        uint8_t buffer[16 * EMG_ADS1293::nb_modules];
+        // uint8_t buffer[16 * EMG_ADS1293::nb_modules];
+        uint8_t *buffer = new uint8_t[16 * EMG_ADS1293::nb_modules];
 
         uint8_t cmd = ADS1293_Reg::DATA_STATUS_REG | 0b10000000;
         int n = device.controller.readCmd_multi(modules_mask, 1, &cmd, 16,
@@ -336,6 +337,7 @@ class EMG_ADS1293 : public Module, virtual public ESC::CLI
                     flags[index] = buffer[16 * index];
                 index++;
             }
+        delete[] buffer;
         return timestamp;
     };
 
