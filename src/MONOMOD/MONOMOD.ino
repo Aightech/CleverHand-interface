@@ -137,27 +137,30 @@ loop()
     }
     while(client.connected())
     {
-        if(client.available())
-        {
-            uint8_t c = client.read();
-            Serial.println((int)c);
-            switch (c)
-            {
-                case 'R':
-                    blink(255, 0, 0, 1, 500);
-                    break;
-                case 'G':
-                    blink(0, 255, 0, 1, 500);
-                    break;
-                case 'B':
-                    blink(0, 0, 255, 1, 500);
-                    break;
-                case 'T':
-                    dt = micros();
-                    client.write((char *)&dt, sizeof(dt));
-                    break;
-            }
-        }
+            dt = micros();
+            client.write((char *)&dt, sizeof(dt));
+            delay(500);
+        // if(client.available())
+        // {
+            // uint8_t c = client.read();
+            // Serial.println((int)c);
+            // switch (c)
+            // {
+            //     case 'R':
+            //         blink(255, 0, 0, 1, 500);
+            //         break;
+            //     case 'G':
+            //         blink(0, 255, 0, 1, 500);
+            //         break;
+            //     case 'B':
+            //         blink(0, 0, 255, 1, 500);
+            //         break;
+            //     case 'T':
+            //         dt = micros();
+            //         client.write((char *)&dt, sizeof(dt));
+            //         break;
+            // }
+        // }
     }
 
     //disconnect from the PC

@@ -21,6 +21,7 @@ class MonoController : public ClvHd::Controller
         : ESC::CLI(verbose, "monoclvhd"), serverTCP(TCP_PORT, 10, verbose),
           serverUDP(UDP_PORT, 10, verbose)
     {
+        std::cout << "MonoController created" << std::endl;
         logln("created", true);
     };
     ~MonoController()
@@ -141,6 +142,7 @@ class MonoController : public ClvHd::Controller
         logln("Client disconnected", true);
     };
 
+
     int
     nbClients()
     {
@@ -152,7 +154,7 @@ class MonoController : public ClvHd::Controller
     Communication::TCPServer serverTCP;
     Communication::UDPServer serverUDP;
 
-    
+
 };
 
 
