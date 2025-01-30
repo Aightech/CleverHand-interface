@@ -199,10 +199,10 @@ else()
 
   #remove the python files from the list
   list(FILTER LIB_SRCS EXCLUDE REGEX "_py.*")
-  
+
   ###### Create the library ######
   add_library(${LIB_NAME} SHARED ${LIB_SRCS})
-  
+
   target_link_libraries(${LIB_NAME}
     PUBLIC ${EXTRA_LIBS})
   target_include_directories(${LIB_NAME}
@@ -227,7 +227,7 @@ else()
       #check if pybind11 submodule is initialized/updated (if the folder is empty)
       # Add pybind11 subdirectory
       execute_process(COMMAND git submodule update --remote --merge --init -- "extern/pybind11"
-          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} OUTPUT_VARIABLE OUTPUT)
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} OUTPUT_VARIABLE OUTPUT)
 
       add_subdirectory(extern/pybind11)
       include_directories(${pybind11_INCLUDE_DIRS})
@@ -285,11 +285,27 @@ else()
     endforeach()
   endif()
 
+  ###### Create the library ######
+  add_library(${PROJECT_NAME} STATIC ${LIB_SRCS})
+
+  # fill EXTRA_LIBS_STATIC with the EXTRA_LIBS without the version lib.major.minor
+  foreach(lib ${EXTRA_LIBS})
+    string(REGEX REPLACE "\\.[0-9]+\\.[0-9]+" "" lib ${lib})
+    list(APPEND EXTRA_LIBS_STATIC ${lib})
+  endforeach()
+
+  target_link_libraries(${PROJECT_NAME}
+    PRIVATE ${EXTRA_LIBS_STATIC})
+  target_include_directories(${PROJECT_NAME}
+    PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  )
+  target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic -Werror)
+
 
   ###### Create package ######
   # Install the library
-  install(TARGETS ${LIB_NAME}
-    EXPORT ${LIB_NAME} 
+  install(TARGETS ${PROJECT_NAME}
+    EXPORT ${PROJECT_NAME}
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
     RUNTIME DESTINATION bin
@@ -299,33 +315,40 @@ else()
   install(DIRECTORY include/ DESTINATION include)
 
   # Export the targets to a script
-  install(EXPORT ${LIB_NAME}
-    FILE ${EXEC_NAME}Config.cmake
-    NAMESPACE ${EXEC_NAME}::
-    DESTINATION lib/cmake/${EXEC_NAME}
+  install(EXPORT ${PROJECT_NAME}
+    FILE ${PROJECT_NAME}.cmake
+    NAMESPACE ${PROJECT_NAME}::
+    DESTINATION lib/cmake/${PROJECT_NAME}
   )
 
   include(CMakePackageConfigHelpers)
   # Create a ConfigVersion.cmake file
   write_basic_package_version_file(
-    "${CMAKE_CURRENT_BINARY_DIR}/${EXEC_NAME}ConfigVersion.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
     VERSION ${PROJECT_VERSION}
-    COMPATIBILITY AnyNewerVersion  # AnyNewerVersion, SameMajorVersion, SameMinorVersion, ExactVersion
+    COMPATIBILITY AnyNewerVersion # AnyNewerVersion, SameMajorVersion, SameMinorVersion, ExactVersion
   )
+
+  set(PACKAGE_DEPENDENCIES "")
+  foreach(pkg ${EXTRA_LIBS})
+      string(REGEX REPLACE "\\.[0-9]+\\.[0-9]+" "" pkg ${pkg})
+      string(APPEND PACKAGE_DEPENDENCIES "find_dependency(${pkg})\n")
+  endforeach()
 
   # Create a Config.cmake file
   configure_package_config_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/Config.cmake.in" # input file
-    "${CMAKE_CURRENT_BINARY_DIR}/${EXEC_NAME}Config.cmake" # output file
-    INSTALL_DESTINATION lib/cmake/${EXEC_NAME}
-  ) 
+    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake" # output file
+    INSTALL_DESTINATION lib/cmake/${PROJECT_NAME}
+  )
 
   # Install the Config.cmake file
   install(FILES
-    "${CMAKE_CURRENT_BINARY_DIR}/${EXEC_NAME}Config.cmake"
-    "${CMAKE_CURRENT_BINARY_DIR}/${EXEC_NAME}ConfigVersion.cmake"
-    DESTINATION lib/cmake/${EXEC_NAME}
+    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
+    DESTINATION lib/cmake/${PROJECT_NAME}
   )
+
 
 
 
