@@ -41,9 +41,6 @@ class MonoController : public ClvHd::Controller
         logln("stopped", true);
     };
 
-  
-    
-
     static void
     callbackTCP(Communication::Server *server,
                 uint8_t *buffer,
@@ -70,12 +67,16 @@ class MonoController : public ClvHd::Controller
         clvhd->logln("Received UDP[" + std::to_string(size) +
                          "]: " + std::string((char *)buffer, size),
                      true);
-        Communication::UDPServer *serverUDP = (Communication::UDPServer *)server;
+        Communication::UDPServer *serverUDP =
+            (Communication::UDPServer *)server;
         serverUDP->send_data((uint8_t *)&port, sizeof(port), addr);
     };
 
     static void
-    newClient(Communication::Server *server, void *addr, Communication::SOCKET s, void *data)
+    newClient(Communication::Server *server,
+              void *addr,
+              Communication::SOCKET s,
+              void *data)
     {
         MonoController *clvhd = (MonoController *)data;
         clvhd->logln("New client", true);
@@ -130,9 +131,27 @@ class MonoController : public ClvHd::Controller
                 {
                 case 'A':
                     logln("Initial message received", true);
+                    uint8_t buff[2];
+                    buff[0] = 'S';
+                    buff[1] = 6;
+                    serverTCP.send_data(buff, 2, s);
                     break;
+                case 'R':
+                {
+                    uint16_t val = 0;
+                    uint8_t size = 0;
+                    serverTCP.read_byte(s, (uint8_t *)&size, 1);
+                    logln("Received size: " + std::to_string(size), true);
+                    for(int i = 0; i < size; i++)
+                    {
+                        serverTCP.read_byte(s, (uint8_t *)&val, 2);
+                        logln("Received value: " + std::to_string(val), true);
+                    }
+                }
+                break;
                 default:
-                    logln("Unknown message received", true);
+                    logln("Unknown message received: " + std::to_string((int)c) +
+                          " : " + std::to_string(c));
                     break;
                 }
             }
@@ -142,7 +161,6 @@ class MonoController : public ClvHd::Controller
         }
         logln("Client disconnected", true);
     };
-
 
     int
     nbClients()
@@ -154,11 +172,7 @@ class MonoController : public ClvHd::Controller
     std::unordered_map<Communication::SOCKET, std::thread> m_clients;
     Communication::TCPServer serverTCP;
     Communication::UDPServer serverUDP;
-
-
 };
-
-
 
 int
 main()
@@ -170,10 +184,9 @@ main()
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
-    std::this_thread::sleep_for(std::chrono::seconds(5));
+    std::this_thread::sleep_for(std::chrono::seconds(10));
     std::cout << "Stop" << std::endl;
     clvhd.stop();
-
 
     return 0;
 }

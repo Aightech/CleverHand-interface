@@ -1,8 +1,7 @@
 #include "WiFi.h"
 #include "WiFiUdp.h"
 #include <Adafruit_NeoPixel.h>
-
-#define DEBUG 1
+#define DEBUG 0
 #define PRINT(s)         \
     if(DEBUG)            \
     {                    \
@@ -16,24 +15,21 @@
 
 #define PIN_LED 6
 #define NB_LED 2
-Adafruit_NeoPixel LED(NB_LED, PIN_LED, NEO_GRB + NEO_KHZ800);
+#include <Preferences.h>
 
-//connect to your local wi-fi network
-const char *ssid = "A&A";
-const char *password = "Df8ttktg5chw";
+Preferences preferences;
+bool wifiConnected = false;
 
 //PC IP address
-const char *pc_ip = "192.168.0.15";
-const int pc_port = 5000;
 bool foundServer = false;
 String server_ip;
 int server_port;
 uint32_t dt;
 
 WiFiUDP udp;
-
 uint8_t sendBuffer[1024];
 
+Adafruit_NeoPixel LED(NB_LED, PIN_LED, NEO_GRB + NEO_KHZ800);
 void
 setRGB(
     int8_t r, int8_t g, int8_t b, int8_t r2 = 0, int8_t g2 = 0, int8_t b2 = 0)
@@ -42,7 +38,6 @@ setRGB(
     LED.setPixelColor(1, LED.Color(r2, g2, b2));
     LED.show();
 }
-
 void
 blink(int8_t r,
       int8_t g,
@@ -63,26 +58,58 @@ blink(int8_t r,
 }
 
 void
-setup()
+storeCredentials(String ssid, String password)
 {
-    LED.begin();
-    LED.setBrightness(255);
+    preferences.begin("wifi", false);
+    preferences.putString("ssid", ssid);
+    preferences.putString("password", password);
+    preferences.end();
+}
 
-    Serial.begin(115200);
+void
+readCredentials(String &ssid, String &password)
+{
+    preferences.begin("wifi", true);
+    ssid = preferences.getString("ssid", "");
+    password = preferences.getString("password", "");
+    preferences.end();
+}
 
-    //connect to your local wi-fi network
-    WiFi.begin(ssid, password);
-    while(WiFi.status() != WL_CONNECTED)
-    {
-        PRINTLN("Connecting to WiFi..");
-        blink(255, 0, 0, 1, 500);
-    }
+bool
+existsCredentials()
+{
+    //check if the credentials are stored
+    preferences.begin("wifi", true);
+    String ssid = preferences.getString("ssid", "");
+    String password = preferences.getString("password", "");
+    preferences.end();
+    return ssid.length() > 0 && password.length() > 0;
+}
 
-    // Serial.println("Connected to the WiFi network");
-    PRINTLN("Connected to the WiFi network at IP: ");
-    PRINTLN(WiFi.localIP());
+void
+parseCredentials(String &ssid, String &password)
+{
+    //first 2bytes are the size of the ssid and password
+    uint8_t size_ssid = Serial.read();
+    uint8_t size_password = Serial.read();
+    char ssid_buf[size_ssid + 1];
+    char password_buf[size_password + 1];
+    Serial.readBytes(ssid_buf, size_ssid);
+    Serial.readBytes(password_buf, size_password);
+    ssid_buf[size_ssid] = '\0';
+    password_buf[size_password] = '\0';
+    ssid = String(ssid_buf);
+    password = String(password_buf);
+}
 
+void
+connectToWiFi(String ssid, String password)
+{
+    WiFi.begin(ssid.c_str(), password.c_str());
+    while(WiFi.status() != WL_CONNECTED) { blink(255, 0, 0, 1, 500); }
+    blink(0, 255, 0, 2, 500);
     udp.begin(12345);
+    wifiConnected = true;
 }
 
 void
@@ -120,54 +147,110 @@ searchServer()
 }
 
 void
+setup()
+{
+    LED.begin();
+    LED.setBrightness(255);
+    Serial.begin(115200);
+
+    if(existsCredentials())
+    {
+        String ssid, password;
+        readCredentials(ssid, password);
+        connectToWiFi(ssid, password);
+    }
+}
+
+void
 loop()
 {
-    if(!foundServer)
-        searchServer();
-    //connect to the PC
-    WiFiClient client;
-    client.connect(server_ip.c_str(), server_port);
-    PRINTLN("Connecting to the PC");
-    blink(0, 255, 0, 5, 100);
-    if(client.connected())
+    //Serial communication for the credentials setup
+    if(Serial.available() > 3)
     {
-        PRINTLN("Connected to the PC");
-        sendBuffer[0] = 'A';
-        client.write(sendBuffer, 1);
-    }
-    while(client.connected())
-    {
-            dt = micros();
-            client.write((char *)&dt, sizeof(dt));
-            delay(500);
-        // if(client.available())
-        // {
-            // uint8_t c = client.read();
-            // Serial.println((int)c);
-            // switch (c)
-            // {
-            //     case 'R':
-            //         blink(255, 0, 0, 1, 500);
-            //         break;
-            //     case 'G':
-            //         blink(0, 255, 0, 1, 500);
-            //         break;
-            //     case 'B':
-            //         blink(0, 0, 255, 1, 500);
-            //         break;
-            //     case 'T':
-            //         dt = micros();
-            //         client.write((char *)&dt, sizeof(dt));
-            //         break;
-            // }
-        // }
+        char cmd = Serial.read();
+        switch(cmd)
+        {
+        case 'C':
+        {
+            String ssid, password;
+            parseCredentials(ssid, password);
+            storeCredentials(ssid, password);
+            connectToWiFi(ssid, password);
+        }
+        break;
+        default:
+            //blink orange
+            blink(255, 165, 0, 1, 500);
+            break;
+        }
     }
 
-    //disconnect from the PC
-    client.stop();
-    foundServer = false;
-    PRINTLN("Disconnected from the PC");
+    //if the wifi is connected
+    if(wifiConnected)
+    {
 
-    //blink the LED
-    blink(0, 0, 255, 1, 5000);
+        if(!foundServer)
+            searchServer();
+
+        //connect to the PC
+        WiFiClient client;
+        client.connect(server_ip.c_str(), server_port);
+        PRINTLN("Connecting to the PC");
+        blink(0, 255, 0, 5, 100);
+        if(client.connected())
+        {
+            PRINTLN("Connected to the PC");
+            sendBuffer[0] = 'A';
+            client.write(sendBuffer, 1);
+        }
+        while(client.connected())
+        {
+            if(client.available())
+            {
+                uint8_t c = client.read();
+                switch(c)
+                {
+                case 'R':
+                    blink(255, 0, 0, 1, 500);
+                    break;
+                case 'G':
+                    blink(0, 255, 0, 1, 500);
+                    break;
+                case 'B':
+                    blink(0, 0, 255, 1, 500);
+                    break;
+                case 'T':
+                    dt = micros();
+                    client.write((char *)&dt, sizeof(dt));
+                    break;
+                case 'S':
+                {
+                    uint8_t nbsample = client.read();
+                    int i = 0;
+                    while(i < 1024 && i * 2 < nbsample)
+                    {
+                        ((uint16_t *)sendBuffer + 2)[i] = i * 2;
+                        i++;
+                    };
+                    sendBuffer[0] = 'R';
+                    sendBuffer[1] = i;
+                    client.write(sendBuffer, i * 2);
+                }
+                }
+            }
+        }
+
+        //disconnect from the PC
+        client.stop();
+        foundServer = false;
+        PRINTLN("Disconnected from the PC");
+
+        //blink the LED
+        blink(0, 0, 255, 1, 5000);
+    }
+    else
+    {
+        //blink red
+        blink(255, 0, 0, 1, 100);
+    }
 }
