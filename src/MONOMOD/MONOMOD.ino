@@ -1,6 +1,7 @@
 #include "WiFi.h"
 #include "WiFiUdp.h"
 #include <Adafruit_NeoPixel.h>
+#include <SPI.h>
 #define DEBUG 0
 #define PRINT(s)         \
     if(DEBUG)            \
@@ -15,6 +16,7 @@
 
 #define PIN_LED 6
 #define NB_LED 2
+#define SPI_CS 7
 #include <Preferences.h>
 
 Preferences preferences;
@@ -28,6 +30,8 @@ uint32_t dt;
 
 WiFiUDP udp;
 uint8_t sendBuffer[1024];
+uint8_t recvBuffer[1024];
+uint8_t spiCmd[255];
 
 Adafruit_NeoPixel LED(NB_LED, PIN_LED, NEO_GRB + NEO_KHZ800);
 void
@@ -100,49 +104,55 @@ parseCredentials(String &ssid, String &password)
     password_buf[size_password] = '\0';
     ssid = String(ssid_buf);
     password = String(password_buf);
+    blink(0, 255, 0, 5, 100);
 }
 
 void
-connectToWiFi(String ssid, String password)
+connectToWiFi(String ssid, String password, int timeout = 4000)
 {
     WiFi.begin(ssid.c_str(), password.c_str());
-    while(WiFi.status() != WL_CONNECTED) { blink(255, 0, 0, 1, 500); }
-    blink(0, 255, 0, 2, 500);
-    udp.begin(12345);
-    wifiConnected = true;
+    unsigned long start = millis();
+    while(WiFi.status() != WL_CONNECTED && millis() - start < timeout)
+        blink(255, 165, 0, 1, 500);//blink orange
+    if(WiFi.status() == WL_CONNECTED)
+    {
+        PRINTLN("Connected to the WiFi network");
+        wifiConnected = true;
+        udp.begin(12345);
+    }
+    else
+    {
+        PRINTLN("Failed to connect to the WiFi network");
+        wifiConnected = false;
+    }
 }
 
 void
 searchServer()
 {
-    while(!foundServer)
+    blink(0, 255, 255, 1, 500);
+    //clear the UDP buffer
+    while(udp.parsePacket() > 0);
+    udp.beginPacket("255.255.255.255", 12345); // Broadcast address
+    uint8_t msg[] = "MONOMOD";
+    udp.write(msg, sizeof(msg));
+    udp.endPacket();
+    delay(500);
+    int packetSize = udp.parsePacket();
+    if(packetSize)
     {
-        blink(0, 255, 255, 1, 500);
-        //clear the UDP buffer
-        while(udp.parsePacket() > 0);
-        udp.beginPacket("255.255.255.255", 12345); // Broadcast address
-        uint8_t msg[] = "MONOMOD";
-        udp.write(msg, sizeof(msg));
-        udp.endPacket();
-        delay(500);
-
-        int packetSize = udp.parsePacket();
-        if(packetSize)
+        server_ip = udp.remoteIP().toString().c_str();
+        server_port = udp.remotePort();
+        PRINTLN("Received packet of size " + String(packetSize) + " from " +
+                server_ip.c_str() + " on port " + String(server_port));
+        char packetBuffer[255];
+        int n = udp.read(packetBuffer, 255);
+        if(n = 2)
         {
-            server_ip = udp.remoteIP().toString().c_str();
-            server_port = udp.remotePort();
-            PRINTLN("Received packet of size " + String(packetSize) + " from " +
-                    server_ip.c_str() + " on port " + String(server_port));
-            char packetBuffer[255];
-            int n = udp.read(packetBuffer, 255);
-            if(n = 2)
-            {
-                server_port = (packetBuffer[1] << 8) + packetBuffer[0];
-                PRINTLN("Server port: " + String(server_port));
-                foundServer = true;
-            }
+            server_port = (packetBuffer[1] << 8) + packetBuffer[0];
+            PRINTLN("Server port: " + String(server_port));
+            foundServer = true;
         }
-        delay(1000);
     }
 }
 
@@ -152,6 +162,11 @@ setup()
     LED.begin();
     LED.setBrightness(255);
     Serial.begin(115200);
+
+    SPI.begin();
+    SPI.beginTransaction(SPISettings(20000000, MSBFIRST, SPI_MODE0));
+    pinMode(SPI_CS, OUTPUT);
+    digitalWrite(SPI_CS, HIGH);
 
     if(existsCredentials())
     {
@@ -186,12 +201,10 @@ loop()
     }
 
     //if the wifi is connected
-    if(wifiConnected)
+    if(wifiConnected && !foundServer)
+        searchServer();
+    if(wifiConnected && foundServer)
     {
-
-        if(!foundServer)
-            searchServer();
-
         //connect to the PC
         WiFiClient client;
         client.connect(server_ip.c_str(), server_port);
@@ -200,8 +213,13 @@ loop()
         if(client.connected())
         {
             PRINTLN("Connected to the PC");
+            String macAddress = WiFi.macAddress();
             sendBuffer[0] = 'A';
-            client.write(sendBuffer, 1);
+            sendBuffer[1] = macAddress.length();
+            //copy the mac address
+            for(int i = 0; i < macAddress.length(); i++)
+                sendBuffer[i + 2] = macAddress[i];
+            client.write(sendBuffer, macAddress.length() + 2);
         }
         while(client.connected())
         {
@@ -210,43 +228,52 @@ loop()
                 uint8_t c = client.read();
                 switch(c)
                 {
-                case 'R':
-                    blink(255, 0, 0, 1, 500);
-                    break;
-                case 'G':
-                    blink(0, 255, 0, 1, 500);
-                    break;
-                case 'B':
-                    blink(0, 0, 255, 1, 500);
-                    break;
-                case 'T':
-                    dt = micros();
-                    client.write((char *)&dt, sizeof(dt));
-                    break;
-                case 'S':
+                case 'l': //set leds
                 {
-                    uint8_t nbsample = client.read();
-                    int i = 0;
-                    while(i < 1024 && i * 2 < nbsample)
-                    {
-                        ((uint16_t *)sendBuffer + 2)[i] = i * 2;
-                        i++;
-                    };
-                    sendBuffer[0] = 'R';
-                    sendBuffer[1] = i;
-                    client.write(sendBuffer, i * 2);
+                    uint8_t rgbbuff[6];
+                    client.readBytes(rgbbuff, 6);
+                    setRGB(rgbbuff[0], rgbbuff[1], rgbbuff[2], rgbbuff[3],
+                           rgbbuff[4], rgbbuff[5]);
                 }
+                case 'r': //read spi
+                {
+                    uint8_t nr = client.read(); //number of bytes to read
+                    uint8_t nc = client.read(); //size of the command to send
+                    client.readBytes(spiCmd, nc);
+                    digitalWrite(SPI_CS, LOW);
+                    //send the command
+                    for(int i = 0; i < nc; i++) SPI.transfer(spiCmd[i]);
+                    //read the data
+                    for(int i = 0; i < nr; i++) sendBuffer[i] = SPI.transfer(0);
+                    digitalWrite(SPI_CS, HIGH);
+                    client.write(sendBuffer, nr);
+                }
+                case 'w': //write spi
+                {
+                    uint8_t nc = client.read();   //size of the command to send
+                    client.readBytes(spiCmd, nc); //read the command
+                    digitalWrite(SPI_CS, LOW);
+                    for(int i = 0; i < nc; i++) SPI.transfer(spiCmd[i]);
+                    digitalWrite(SPI_CS, HIGH);
+                }
+                default:
+                {
+                    //unknown cmd, clear client buffer
+                    while(client.available()){client.read();}
+                }
+
                 }
             }
+            delay(1);
         }
-
+        blink(255, 165, 0, 10, 100);//blink orange
         //disconnect from the PC
         client.stop();
         foundServer = false;
         PRINTLN("Disconnected from the PC");
 
         //blink the LED
-        blink(0, 0, 255, 1, 5000);
+        blink(0, 0, 255, 1, 500);
     }
     else
     {
