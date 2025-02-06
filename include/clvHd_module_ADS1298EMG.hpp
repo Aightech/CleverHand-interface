@@ -6,13 +6,13 @@
 #include <iostream>
 #include <string>
 #include <vector>
-
-#include "clvHdController.hpp"
-#include "registers.hpp"
-#include "strANSIseq.hpp"
 #include <stdint.h> // uint8_t, uint16_t, uint32_t, uint64_t
 
-#include "clvHdDevice.hpp"
+#include "clvHd_controller.hpp"
+#include "registers.hpp"
+#include "strANSIseq.hpp"
+
+#include "clvHd_device.hpp"
 
 namespace ClvHd
 {

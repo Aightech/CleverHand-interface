@@ -12,9 +12,11 @@
 #define TCP_PORT 5000
 #define UDP_PORT 12345
 
+#include "clvHd_controller.hpp"
+
 namespace ClvHd
 {
-class MonoController : virtual public ESC::CLI
+class MonoController : public Controller
 {
     public:
     MonoController(int verbose = -1)
@@ -55,6 +57,16 @@ class MonoController : virtual public ESC::CLI
         for(auto &client : m_clients) { client.second.join(); }
         logln("stopped", true);
     };
+
+    virtual void setRGB(int id_module, RGBColor &color)
+    {
+        (void)id_module;
+        (void)color;
+    }
+
+
+    uint8_t setup()
+    {return 0;};
 
     static void
     callbackTCP(Communication::Server *server,
@@ -115,6 +127,40 @@ class MonoController : virtual public ESC::CLI
     nbClients()
     {
         return m_clients.size();
+    };
+
+
+    virtual int
+    readCmd_multi(uint32_t mask_id,
+                  uint8_t n_cmd,
+                  uint8_t *cmd,
+                  uint8_t size,
+                  const void *buff,
+                  uint64_t *timestamp = nullptr) override
+    {
+        (void)mask_id;
+        (void)n_cmd;
+        (void)cmd;
+        (void)size;
+        (void)buff;
+        (void)timestamp;
+        return 0;
+    };
+
+
+    virtual int
+    writeCmd_multi(uint32_t mask_id,
+                   uint8_t n_cmd,
+                   uint8_t *cmd,
+                   uint8_t size = 0,
+                   const void *data = nullptr) override
+    {
+        (void)mask_id;
+        (void)n_cmd;
+        (void)cmd;
+        (void)size;
+        (void)data;
+        return 0;
     };
 
     private:

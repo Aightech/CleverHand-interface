@@ -1,0 +1,63 @@
+classDiagram
+direction LR
+	namespace CLvHd {
+        class Device {
+        }
+
+        class Controller {
+        }
+
+        class MonoController {
+        }
+
+        class SerialController {
+        }
+
+        class ADS1293 {
+        }
+
+        class ADS1293Pack {
+        }
+
+        class ADS1298 {
+        }
+
+        class ModulePack {
+        }
+
+        class ADS1298Pack {
+        }
+
+        class Module {
+        }
+
+	}
+	namespace Communication {
+        class TCPserver {
+        }
+
+        class UDPserver {
+        }
+
+        class Serial {
+        }
+
+	}
+
+    ADS1293 --|> Module : Inheritance
+    ADS1298 --|> Module : Inheritance
+    ADS1298Pack --|> ModulePack : Inheritance
+    ADS1293Pack --|> ModulePack : Inheritance
+    Module ..> Controller : pointer
+    Device ..> Controller : pointer
+    Device --> Module : vector of
+    ADS1293Pack --> ADS1293 : vector of
+    ADS1298Pack --> ADS1298 : vector of
+    Controller <|-- MonoController : Inheritance
+    Controller <|-- SerialController : Inheritance
+    MonoController -- TCPserver
+    MonoController -- UDPserver
+    SerialController -- Serial
+    ModulePack ..> Device : pointer
+    
+

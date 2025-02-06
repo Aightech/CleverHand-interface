@@ -1,4 +1,4 @@
-#include <clvHdADS1293EMG.hpp>
+#include <clvHd_module_ADS1293EMG.hpp>
 
 namespace ClvHd
 {
@@ -9,11 +9,12 @@ uint8_t EMG_ADS1293::nb_modules = 0;
 ESC::CLI EMG_ADS1293::s_cli = ESC::CLI(-1, "EMG_ADS1293");
 
 EMG_ADS1293::EMG_ADS1293(Controller *controller, int id, int verbose)
-    : ESC::CLI(verbose, "EMG_" + std::to_string(id))
+    : ESC::CLI(verbose, "EMG_" + std::to_string(id)), Module(controller, id, verbose)
 {
     this->id = id;
     this->m_controller = controller;
     this->m_type = "EMG_ADS1293";
+    this->typed = true;
     logln("Initialised", true);
     for(int i = 0; i < 0x50; i++) m_regs[i] = 0x00;
 
