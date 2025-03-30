@@ -18,6 +18,71 @@ namespace ClvHd
 
 using namespace std;
 
+class EMG_ADS1293Config
+{
+    public:
+    EMG_ADS1293Config() {}
+    ~EMG_ADS1293Config() {}
+    void
+    enable(bool ch1, bool ch2, bool ch3)
+    {
+        chx_enable[0] = ch1;
+        chx_enable[1] = ch2;
+        chx_enable[2] = ch3;
+    }
+    void
+    set_route(int ch, int pos_in, int neg_in)
+    {
+        route_table[ch][0] = pos_in;
+        route_table[ch][1] = neg_in;
+    }
+    void
+    set_high_res(int ch, bool high_res)
+    {
+        chx_high_res[ch] = high_res;
+    }
+    void
+    set_high_freq(int ch, bool high_freq)
+    {
+        chx_high_freq[ch] = high_freq;
+    }
+    void
+    set_R1(int ch, int r1)
+    {
+        R1[ch] = r1;
+    }
+    void
+    set_R2(int r2)
+    {
+        R2 = r2;
+    }
+    void
+    set_R3(int ch, int r3)
+    {
+        R3[ch] = r3;
+    }
+    void
+    set_clock_intern(bool clock_intern)
+    {
+        this->clock_intern = clock_intern;
+    }
+
+    bool chx_enable[3] = {true, true, true}; // Enable channel 1
+    int route_table[3][2] = {
+        {1, 2},  // (-) and (+) electrodes of the first channel
+        {3, 4},  // (-) and (+) electrodes of the second channel
+        {5, 6}}; // (-) and (+) electrodes of the third channel
+    bool chx_high_res[3] = {true, true,
+                            true}; // Enable or disable the high resolution mode
+    bool chx_high_freq[3] = {true, true,
+                             true}; // Enable or disable the high frequency mode
+    int R1[3] = {2, 2, 2};          // Gain R1 of the INA channels
+    int R2 = 4;                     // Gain R2 of the INA channels
+    int R3[3] = {4, 4, 4};          // Gain R3 of the INA channels
+    bool clock_intern = true;       // Use internal clock
+};
+
+
 /**
  * @brief The EMG class
  *
@@ -83,6 +148,14 @@ class EMG_ADS1293 : public Module
         return m_controller->writeCmd(this->id, 1, &cmd, n, val);
     }
 
+    bool
+    testType()
+    {
+        uint8_t val;
+        readReg(ADS1293_Reg::REVID_REG, 1, &val);
+        return (val == 1);
+    }
+
     /**
      * @brief setup Write all setup parameters to the board.
      *
@@ -103,7 +176,15 @@ class EMG_ADS1293 : public Module
           int R2,
           int R3[3],
           bool clock_intern = true);
-
+    
+    /**
+     * @brief route_channel Route the EMG channels to the input electrodes.
+     * 
+     * @param channel Channel to route (0, 1, 2).
+     * @param pos_in Positive input electrode (0: unused, 1 to 6: electrode).
+     * @param neg_in Negative input electrode (0: unused, 1 to 6: electrode).
+     * @return int 0 if success, -1 if error.
+     */
     int
     route_channel(uint8_t channel, uint8_t pos_in, uint8_t neg_in);
 
@@ -268,7 +349,11 @@ class EMG_ADS1293 : public Module
     static uint32_t modules_mask;
     static uint8_t nb_modules;
 
-    uint8_t* regsAddr() { return m_regs; }
+    uint8_t *
+    regsAddr()
+    {
+        return m_regs;
+    }
 
     private:
     uint8_t m_regs[0x50];
@@ -308,10 +393,11 @@ class EMG_ADS1293Pack : public ModulePack
                 //create a temporary EMG_ADS1293 object to test the module type
                 EMG_ADS1293 *emg = new EMG_ADS1293(
                     m_device->controller, m_device->modules[i]->id, m_verbose);
-                bool is_correct_type = emg->testType();
+                bool is_correct_type =
+                    emg->testType(); // NB: testType() should be implemented in the specific module
                 if(is_correct_type) // ADS1293
                 {
-                    log(ESC::fstr("OK\n", {ESC::FG_GREEN, ESC::BOLD}));
+                    log(ESC::fstr("OK\n", {ESC::FG_GREEN, ESC::BOLD}), false);
                     this->addModule(emg);
                     //delete and replace the device default module
                     delete m_device->modules[i];
@@ -327,6 +413,17 @@ class EMG_ADS1293Pack : public ModulePack
             {
                 log(ESC::fstr("ALREADY TYPED\n", {ESC::FG_YELLOW, ESC::BOLD}));
             }
+        }
+    };
+
+    void configure(EMG_ADS1293Config &config)
+    {
+        for(size_t i = 0; i < this->modules.size(); i++)
+        {
+            EMG_ADS1293 *emg = (EMG_ADS1293 *)this->modules[i];
+            emg->setup(config.route_table, config.chx_enable,
+                       config.chx_high_res, config.chx_high_freq, config.R1,
+                       config.R2, config.R3, config.clock_intern);
         }
     };
 
@@ -348,32 +445,38 @@ class EMG_ADS1293Pack : public ModulePack
         uint8_t *buffer = new uint8_t[16 * this->modules.size()];
 
         uint8_t cmd = ADS1293_Reg::DATA_STATUS_REG | 0b10000000;
-        int n = m_device->controller->readCmd_multi(m_mask, 1, &cmd, 16,
-                                                buffer, &timestamp);
+        int n = m_device->controller->readCmd_multi(m_mask, 1, &cmd, 16, buffer,
+                                                    &timestamp);
+        // log("Read " + std::to_string(n) + " bytes", true);
         if((size_t)n != 16 * this->modules.size())
             throw log_error("Error reading EMG data");
 
         for(size_t i = 0, index = 0; i < this->modules.size(); i++)
         {
-                EMG_ADS1293 *emg = (EMG_ADS1293 *)this->modules[i];
-                std::copy(buffer + 16 * index,       //index-th status register
-                          buffer + 16 * (index + 1), //last sample byte
-                          emg->regsAddr() + ADS1293_Reg::DATA_STATUS_REG); //dest
-                for(int ch = 0; ch < 3; ch++)
-                {
-                    sensorValues[i]->time_s = timestamp/1000000.0;
-                    sensorValues[i]->time_ns = timestamp%1000000;
-                    if(fast)
-                        sensorValues[i]->data[ch] = emg->fast_value(ch);
-                    else
-                        sensorValues[i]->data[ch] = emg->precise_value(ch);
-                }
-                index++;
+            EMG_ADS1293 *emg = (EMG_ADS1293 *)this->modules[i];
+            // printf("Status register: 0x%02X\n", buffer[16 * index]);
+            std::copy(buffer + 16 * index,       //index-th status register
+                      buffer + 16 * (index + 1), //last sample byte
+                      emg->regsAddr() + ADS1293_Reg::DATA_STATUS_REG); //dest
+            // printf("hey\n");
+            for(int ch = 0; ch < 3; ch++)
+            {
+                sensorValues[i]->time_s = timestamp / 1000000.0;
+                sensorValues[i]->time_ns = timestamp % 1000000;
+                // printf("hey\n");
+                if(fast)
+                    sensorValues[i]->data[ch] = emg->fast_value(ch);
+                else
+                    sensorValues[i]->data[ch] = emg->precise_value(ch);
             }
+            index++;
+        }
         delete[] buffer;
         return sensorValues;
     };
 };
+
+
 
 } // namespace ClvHd
 #endif //CLV_HD_EMG_H

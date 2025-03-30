@@ -59,6 +59,7 @@ class Module : public virtual ESC::CLI
     virtual bool
     testType()
     {
+        throw std::string("testType() not implemented");
         return false;
     };
 
