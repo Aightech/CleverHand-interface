@@ -15,7 +15,7 @@ EMG_ADS1293::EMG_ADS1293(Controller *controller, int id, int verbose)
     this->m_controller = controller;
     this->m_type = "EMG_ADS1293";
     this->typed = true;
-    logln("Initialised", true);
+    // logln("Initialised", true);
     for(int i = 0; i < 0x50; i++) m_regs[i] = 0x00;
 
     m_regs[CONFIG_REG] = 0x02;
@@ -39,6 +39,10 @@ EMG_ADS1293::EMG_ADS1293(Controller *controller, int id, int verbose)
     for(int i = 0; i < 3; i++) { m_precise_adc_max[i] = 0x800000; }
 
     m_fast_value[0] = 0;
+
+    sensorValue.data.resize(3);
+    sensorValue.time_s = 0;
+    sensorValue.time_ns = 0;
 };
 
 EMG_ADS1293::~EMG_ADS1293() { this->writeReg(CONFIG_REG, 0x02); }
