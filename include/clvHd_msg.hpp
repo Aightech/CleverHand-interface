@@ -2,6 +2,7 @@
 #define __CLV_HD_MSG_HPP__
 
 #include <vector>
+#include <cstdint>
 
 namespace ClvHd
 {
