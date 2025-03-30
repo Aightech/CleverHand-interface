@@ -41,22 +41,24 @@ class SerialController : public Controller
 
     public:
     SerialController(int verbose = -1)
-        : ESC::CLI(verbose, "ClvHd-Controller"),
-          m_serial(verbose) {};
+        : ESC::CLI(verbose, "ClvHd-Controller"), m_serial(verbose) {};
     ~SerialController()
     {
         sendCmd('z');
         m_serial.close_connection();
     };
 
-    void open(const char *path)
+    void
+    open(const char *path)
     {
-        m_serial.open_connection(path, 500000, O_RDWR | O_NOCTTY);
+        m_serial.open_connection(path, 460800, O_RDWR | O_NOCTTY);
     };
 
-    virtual void setRGB(int id_module, RGBColor &color)
+    virtual void
+    setRGB(int id_module, RGBColor &color)
     {
-        uint8_t msg[6] = {'i', (uint8_t)id_module, 0, color.red[0], color.green[0], color.blue[0]};
+        uint8_t msg[6] = {'i',          (uint8_t)id_module, 0,
+                          color.red[0], color.green[0],     color.blue[0]};
         sendCmd(msg, 6);
     };
 
@@ -102,9 +104,21 @@ class SerialController : public Controller
     readReply(uint8_t *buff, uint64_t *timestamp = nullptr)
     {
         // Read the timestamp and the size of the data (8 bytes + 1 byte)
+        // printf("readReply\n");
         int n = m_serial.readS(m_buffer, 9);
+        // printf("n: %d \t size: %d\n", n, m_buffer[8]);
         if(n == 9)
         {
+            // uint64_t ts = 0;
+            // uint8_t sbuff = 0;
+            // uint8_t val = 0;
+            // ts = *(uint64_t *)m_buffer;
+            // sbuff = m_buffer[8];
+            // val = m_buffer[9];
+            // printf("ts: %lu\n", ts);
+            // printf("sbuff: %d\n", sbuff);
+            // printf("val: %d\n", val);
+
             if(timestamp != nullptr)
                 *timestamp = *(uint64_t *)m_buffer;
             n = m_serial.readS(buff, m_buffer[8]);
@@ -142,7 +156,6 @@ class SerialController : public Controller
         sendCmd(cmd, n_cmd);
         return readReply((uint8_t *)buff, timestamp);
     };
-
 
     /**
      * @brief writeReg_multi write size byte to the modules given by the mask_id.

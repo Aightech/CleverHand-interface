@@ -17,7 +17,7 @@ class ClvHd
     begin()
     {
         SPI.begin();
-        SPI.beginTransaction(SPISettings(20000000, MSBFIRST, SPI_MODE0));
+        SPI.beginTransaction(SPISettings(2000000, MSBFIRST, SPI_MODE0));
         for(int i = 0; i < 5; i++) pinMode(m_addPins[i], OUTPUT);
         selectBrd(0xff);
         pinMode(m_availPin, INPUT_PULLUP);
