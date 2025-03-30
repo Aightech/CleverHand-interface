@@ -2,7 +2,7 @@
 if(NOT COMMAND subproject_version)
   function(subproject_version subproject_name VERSION_VAR)
     # Read CMakeLists.txt for subproject and extract project() call(s) from it.
-    file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/${subproject_name}/CMakeConfig.txt" project_calls REGEX "[ \t]*set\\(")
+    file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/${subproject_name}/CMakeConfig.cmake" project_calls REGEX "[ \t]*set\\(")
     # For every project() call try to extract its VERSION option
     foreach(project_call ${project_calls})
       string(REGEX MATCH "VERSION[ ]+([^ )]+)" version_param "${project_call}")

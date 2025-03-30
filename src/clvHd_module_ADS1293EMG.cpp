@@ -1,4 +1,4 @@
-#include <clvHdADS1293EMG.hpp>
+#include <clvHd_module_ADS1293EMG.hpp>
 
 namespace ClvHd
 {
@@ -9,12 +9,13 @@ uint8_t EMG_ADS1293::nb_modules = 0;
 ESC::CLI EMG_ADS1293::s_cli = ESC::CLI(-1, "EMG_ADS1293");
 
 EMG_ADS1293::EMG_ADS1293(Controller *controller, int id, int verbose)
-    : ESC::CLI(verbose, "EMG_" + std::to_string(id))
+    : ESC::CLI(verbose, "EMG_" + std::to_string(id)), Module(controller, id, verbose)
 {
     this->id = id;
     this->m_controller = controller;
     this->m_type = "EMG_ADS1293";
-    logln("Initialised", true);
+    this->typed = true;
+    // logln("Initialised", true);
     for(int i = 0; i < 0x50; i++) m_regs[i] = 0x00;
 
     m_regs[CONFIG_REG] = 0x02;
@@ -38,8 +39,10 @@ EMG_ADS1293::EMG_ADS1293(Controller *controller, int id, int verbose)
     for(int i = 0; i < 3; i++) { m_precise_adc_max[i] = 0x800000; }
 
     m_fast_value[0] = 0;
-    if(id == 0)
-        m_fast_value[0] = 0xabcd;
+
+    sensorValue.data.resize(3);
+    sensorValue.time_s = 0;
+    sensorValue.time_ns = 0;
 };
 
 EMG_ADS1293::~EMG_ADS1293() { this->writeReg(CONFIG_REG, 0x02); }
@@ -85,7 +88,7 @@ EMG_ADS1293::setup(int route_table[3][2],
 
     this->get_filters(R1, &R2, R3);
 
-    int range[3] = {0, 1, 2};
+    // int range[3] = {0, 1, 2};
 
     logln("Seting up ADS1293 : " + ((n == 8) ? fstr(" OK", {BOLD, FG_GREEN})
                                              : fstr(" ERROR", {BOLD, FG_RED})),
@@ -140,10 +143,10 @@ EMG_ADS1293::setup(int route_table[3][2],
 int
 EMG_ADS1293::route_channel(uint8_t channel, uint8_t pos_in, uint8_t neg_in)
 {
-    pos_in = (pos_in < 0) ? 0 : (pos_in > 6) ? 6 : pos_in;
-    neg_in = (neg_in < 0) ? 0 : (neg_in > 6) ? 6 : neg_in;
+    pos_in = (pos_in > 6) ? 6 : pos_in;
+    neg_in = (neg_in > 6) ? 6 : neg_in;
 
-    channel = ((channel < 0) ? 0 : (channel > 2) ? 2 : channel);
+    channel = (channel > 2) ? 2 : channel;
     uint8_t val = pos_in | (neg_in << 3);
     if(pos_in == neg_in)
         val |= 0xc0;
@@ -154,7 +157,7 @@ EMG_ADS1293::route_channel(uint8_t channel, uint8_t pos_in, uint8_t neg_in)
 int
 EMG_ADS1293::route_channel_test(uint8_t channel, bool pos_test, bool neg_test)
 {
-    channel = ((channel < 0) ? 0 : (channel > 2) ? 2 : channel);
+    channel = (channel > 2) ? 2 : channel;
     uint8_t val = (pos_test ? 0x80 : 0) | (neg_test ? 0x40 : 0);
     m_regs[FLEX_CH0_CN_REG + channel] = val;
     return this->writeReg(FLEX_CH0_CN_REG + channel, val);
@@ -298,7 +301,7 @@ EMG_ADS1293::config_resolution(bool ch0_high_res,
                                bool ch2_high_res)
 {
     uint8_t val = (m_regs[AFE_RES_REG] & 0b00111000) |
-                  (ch0_high_res ? 0b1 : 0) | (ch2_high_res ? 0b010 : 0) |
+                  (ch0_high_res ? 0b1 : 0) | (ch1_high_res ? 0b010 : 0) |
                   (ch2_high_res ? 0b100 : 0);
     m_regs[AFE_RES_REG] = val;
     return this->writeReg(AFE_RES_REG, val);

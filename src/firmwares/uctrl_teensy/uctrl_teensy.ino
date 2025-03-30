@@ -16,7 +16,7 @@ void
 setup()
 {
 
-    Serial.begin(500000);
+    Serial.begin(460800);
     delay(1000);
     clvHd.begin();
 }
@@ -93,7 +93,7 @@ loop()
         {
             //init clvHd
             uint8_t n = clvHd.initModules();
-            *timestamp = 0; //micros();
+            *timestamp = 1; //micros();
             *vals_buff = n;
             *size_buff = 1;
             Serial.write(send_buff, 9 + *size_buff);

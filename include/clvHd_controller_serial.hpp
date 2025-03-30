@@ -1,6 +1,5 @@
-#ifndef CLVHDCONTROLLER_H
-#define CLVHDCONTROLLER_H
-
+#ifndef __CLVHDCONTROLLER_SERIAL_HPP
+#define __CLVHDCONTROLLER_SERIAL_HPP
 #include <cmath>
 #include <cstring>
 #include <iostream> // std::cout, std::endl
@@ -16,7 +15,7 @@
 #include <stdint.h> // uint8_t, uint16_t, uint32_t, uint64_t
 #include <stdio.h>  // Standard input/output definitions
 
-#include "clvHdModule.hpp" // Module class
+#include "clvHd_module.hpp" // Module class
 #include <serial_client.hpp>
 
 #define CLVHD_PACKET_SIZE 6
@@ -35,23 +34,36 @@ class Module;
  * @author Alexis Devillard
  * @date 2022
  */
-class Controller : public Communication::Serial
+class SerialController : public Controller
 {
-    using clk = std::chrono::system_clock;
-    using sec = std::chrono::duration<double>;
+    // using clk = std::chrono::system_clock;
+    // using sec = std::chrono::duration<double>;
 
     public:
-    Controller(int verbose = -1)
-        : Communication::Serial(verbose),
-          ESC::CLI(verbose, "ClvHd-Controller") {};
-    ~Controller()
+    SerialController(int verbose = -1)
+        : ESC::CLI(verbose, "ClvHd-Controller"), m_serial(verbose) {};
+    ~SerialController()
     {
         sendCmd('z');
-        this->close_connection();
+        m_serial.close_connection();
+    };
+
+    void
+    open(const char *path)
+    {
+        m_serial.open_connection(path, 460800, O_RDWR | O_NOCTTY);
+    };
+
+    virtual void
+    setRGB(int id_module, RGBColor &color)
+    {
+        uint8_t msg[6] = {'i',          (uint8_t)id_module, 0,
+                          color.red[0], color.green[0],     color.blue[0]};
+        sendCmd(msg, 6);
     };
 
     uint8_t
-    setup(uint8_t *data = nullptr)
+    setup()
     {
         logln("Setup controller board", true);
         sendCmd('s');
@@ -70,10 +82,10 @@ class Controller : public Communication::Serial
         return sendCmd(&cmd, 1);
     };
 
-    int
+    virtual int
     sendCmd(uint8_t *data, size_t size)
     {
-        if(this->writeS(data, size) != size)
+        if((size_t)m_serial.writeS(data, size) != size)
         {
             logln("Error sending command", true);
             return -1;
@@ -88,43 +100,33 @@ class Controller : public Communication::Serial
      * @param timestamp Timestamp of the reply.
      * @return int Number of bytes read.
      */
-    int
+    virtual int
     readReply(uint8_t *buff, uint64_t *timestamp = nullptr)
     {
         // Read the timestamp and the size of the data (8 bytes + 1 byte)
-        int n = this->readS(m_buffer, 9);
+        // printf("readReply\n");
+        int n = m_serial.readS(m_buffer, 9);
+        // printf("n: %d \t size: %d\n", n, m_buffer[8]);
         if(n == 9)
         {
+            // uint64_t ts = 0;
+            // uint8_t sbuff = 0;
+            // uint8_t val = 0;
+            // ts = *(uint64_t *)m_buffer;
+            // sbuff = m_buffer[8];
+            // val = m_buffer[9];
+            // printf("ts: %lu\n", ts);
+            // printf("sbuff: %d\n", sbuff);
+            // printf("val: %d\n", val);
+
             if(timestamp != nullptr)
                 *timestamp = *(uint64_t *)m_buffer;
-            n = this->readS(buff, m_buffer[8]);
+            n = m_serial.readS(buff, m_buffer[8]);
             // printf("n: %d \t size: %d\n", n, m_buffer[8]);
             return n;
         }
         else
             return -1;
-    };
-
-    /**
-     * @brief readCmd read size byte from the module with the given id.
-     *
-     * @param id Id of the module to read from.
-     * @param n_cmd Number of bytes of the read command.
-     * @param cmd Read command to send to the module.
-     * @param size Number of bytes to read.
-     * @param buff Buffer to store the data.
-     * @return int Number of bytes read.
-     */
-    int
-    readCmd(uint8_t id,
-            uint8_t n_cmd,
-            uint8_t *cmd,
-            uint8_t size,
-            const void *buff,
-            uint64_t *timestamp = nullptr)
-    {
-        return readCmd_multi(((uint32_t)1) << id, n_cmd, cmd, size, buff,
-                             timestamp);
     };
 
     /**
@@ -137,13 +139,13 @@ class Controller : public Communication::Serial
      * @param buff Buffer to store the data.
      * @return int Number of bytes read.
      */
-    int
+    virtual int
     readCmd_multi(uint32_t mask_id,
                   uint8_t n_cmd,
                   uint8_t *cmd,
                   uint8_t size,
                   const void *buff,
-                  uint64_t *timestamp = nullptr)
+                  uint64_t *timestamp = nullptr) override
     {
         uint8_t msg[6];
         *(uint32_t *)msg = mask_id;
@@ -156,22 +158,6 @@ class Controller : public Communication::Serial
     };
 
     /**
-     * @brief writeReg write size byte to the module with the given id.
-     *
-     * @param id Id of the module to write to.
-     * @param n_cmd Number of bytes of the write command.
-     * @param cmd Write command to send to the module.
-     * @param size Number of bytes to write.
-     * @param data Data to write.
-     * @return int Number of bytes written.
-     */
-    int
-    writeCmd(uint8_t id, uint8_t n_cmd, uint8_t *cmd, uint8_t size=0, const void *data=nullptr)
-    {
-        return writeCmd_multi(((uint32_t)1) << id, n_cmd, cmd, size, data);
-    };
-
-    /**
      * @brief writeReg_multi write size byte to the modules given by the mask_id.
      *
      * @param mask_id Mask of the modules to write to.
@@ -181,12 +167,12 @@ class Controller : public Communication::Serial
      * @param data Data to write.
      * @return int Number of bytes written.
      */
-    int
+    virtual int
     writeCmd_multi(uint32_t mask_id,
                    uint8_t n_cmd,
                    uint8_t *cmd,
-                   uint8_t size=0,
-                   const void *data=nullptr)
+                   uint8_t size = 0,
+                   const void *data = nullptr) override
     {
         uint8_t msg[6];
         *(uint32_t *)msg = mask_id;
@@ -199,12 +185,6 @@ class Controller : public Communication::Serial
             return sendCmd((uint8_t *)data, size);
         else
             return 0;
-    };
-
-    void setRGB(uint8_t id_module, uint8_t id_led, uint8_t r, uint8_t g, uint8_t b)
-    {
-        uint8_t msg[6]={'i', id_module, id_led, r, g, b};
-        sendCmd(msg, 6);
     };
 
     /**
@@ -231,7 +211,7 @@ class Controller : public Communication::Serial
     test_connection()
     {
         uint8_t arr[3] = {1, 2, 3};
-        int n = sendCmd('m');
+        sendCmd('m');
         sendCmd(arr, 3);
         uint8_t ans[3];
         if(readReply(ans) == 3)
@@ -266,6 +246,7 @@ class Controller : public Communication::Serial
 
     private:
     uint8_t m_buffer[CLVHD_BUFFER_SIZE];
+    Communication::Serial m_serial;
 };
 } // namespace ClvHd
-#endif
+#endif // __CLVHDCONTROLLER_SERIAL_HPP
