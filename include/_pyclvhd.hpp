@@ -2,9 +2,9 @@
 #define __PY_CLV_HD_HPP__
 
 #include "clvHd.hpp"
+#include <limits> // For std::numeric_limits
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
-#include <limits>  // For std::numeric_limits
 
 namespace py = pybind11;
 
@@ -29,7 +29,7 @@ class pyDevice : public ClvHd::Device
     // {
     //     int route_table[3][2];
     //     for (size_t i = 0; i < 3; ++i) {
-    //         py::list inner_list = _route_table[i].cast<py::list>();  
+    //         py::list inner_list = _route_table[i].cast<py::list>();
     //         for (size_t j = 0; j < 2; ++j) {
     //             route_table[i][j] = inner_list[j].cast<int>();
     //         }
@@ -52,7 +52,7 @@ class pyDevice : public ClvHd::Device
     //     }
 
     //     ClvHd::EMG_ADS1293::setup(*this, chx_enable, route_table, chx_high_res, chx_high_freq, R1, R2, R3);
-        
+
     // }
 
     // py::tuple
@@ -89,8 +89,6 @@ class pyDevice : public ClvHd::Device
     //     return py::make_tuple(timestamp, fast_list, precise_list);
     // }
 
-
-
     // void
     // setRGB(int id_module, int id_led, py::list rgb)
     // {
@@ -108,29 +106,31 @@ class pyDevice : public ClvHd::Device
 class pyEMG_ADS1293Pack : public ClvHd::EMG_ADS1293Pack
 {
     public:
-    pyEMG_ADS1293Pack(int id, int verbose = -1)
-        : ClvHd::EMG_ADS1293Pack(id, verbose), ESC::CLI(verbose, "pyClvHd-EMG_ADS1293Pack") {};
+    pyEMG_ADS1293Pack(pyDevice &device, int verbose = -1)
+        : ClvHd::EMG_ADS1293Pack(&device, verbose),
+          ESC::CLI(verbose, "pyClvHd-EMG_ADS1293Pack") {};
     ~pyEMG_ADS1293Pack() {};
 
     void
-    setup(py::list _route_table,
-                py::list _chx_enable,
-                py::list _chx_high_res,
-                py::list _chx_high_freq,
-                py::list _R1,
-                int R2,
-                py::list _R3)
+    pysetup(py::list _route_table,
+            py::list _chx_enable,
+            py::list _chx_high_res,
+            py::list _chx_high_freq,
+            py::list _R1,
+            int R2,
+            py::list _R3)
     {
         ClvHd::EMG_ADS1293Config config;
-        config.enable(
-            _chx_enable[0].cast<bool>(), _chx_enable[1].cast<bool>(),
-            _chx_enable[2].cast<bool>());
-        for (size_t i = 0; i < 3; ++i) {
+        config.enable(_chx_enable[0].cast<bool>(), _chx_enable[1].cast<bool>(),
+                      _chx_enable[2].cast<bool>());
+        for(size_t i = 0; i < 3; ++i)
+        {
             py::list inner_list = _route_table[i].cast<py::list>();
             config.set_route(i, inner_list[0].cast<int>(),
                              inner_list[1].cast<int>());
         }
-        for (size_t i = 0; i < 3; ++i) {
+        for(size_t i = 0; i < 3; ++i)
+        {
             config.set_high_res(i, _chx_high_res[i].cast<bool>());
             config.set_high_freq(i, _chx_high_freq[i].cast<bool>());
             config.set_R1(i, _R1[i].cast<int>());
@@ -141,40 +141,24 @@ class pyEMG_ADS1293Pack : public ClvHd::EMG_ADS1293Pack
         this->configure(config);
     };
 
+
     py::tuple
-    read_all(bool fast = true)
+    pyread_all(bool fast = true)
     {
-        int nb_modules = ClvHd::EMG_ADS1293::nb_modules;
-        printf("nb_modules: %d\n", nb_modules);
-        double fast[ClvHd::EMG_ADS1293::nb_modules * 3];
-        double precise[ClvHd::EMG_ADS1293::nb_modules * 3];
-        uint8_t flags[ClvHd::EMG_ADS1293::nb_modules];
-        uint64_t timestamp =
-            ClvHd::EMG_ADS1293::read_all(*this, fast, precise, flags);
-        py::list fast_list;
-        py::list precise_list;
-        for(int i = 0; i < ClvHd::EMG_ADS1293::nb_modules; i++)
+        std::vector<ClvHd::Value *> values = this->read_all(fast);
+        double timestamp = values[0]->time_s + values[0]->time_ns / 1000000.0;
+        py::list module_list;
+        for(size_t i = 0; i < values.size(); i++)
         {
-            py::list fast_ch;
-            py::list precise_ch;
-            for(int j = 0; j < 3; j++)
+            py::list channel_list;
+            for(int j = 0; j < values[i]->data.size(); j++)
             {
-                //check if the value is available
-                if((flags[i]>>(2+j))&0b1)
-                    fast_ch.append(fast[3 * i + j]);
-                else//add NaN
-                    fast_ch.append(std::numeric_limits<double>::quiet_NaN());
-                if((flags[i]>>(5+j))&0b1)
-                    precise_ch.append(precise[3 * i + j]);
-                else//add NaN
-                    precise_ch.append(std::numeric_limits<double>::quiet_NaN());
+                channel_list.append(values[i]->data[j]);
             }
-            fast_list.append(fast_ch);
-            precise_list.append(precise_ch);
+            module_list.append(channel_list);
         }
-        return py::make_tuple(timestamp, fast_list, precise_list);
+        return py::make_tuple(timestamp, module_list);
     };
-    
 };
 
 } // namespace ClvHd
@@ -183,22 +167,33 @@ PYBIND11_MODULE(pyclvhd, m)
 {
     py::class_<ClvHd::pyDevice>(m, "Device")
         .def(py::init<int>(), py::arg("verbose") = -1)
-        .def("initSerial", &ClvHd::pyDevice::initSerial,
-             py::arg("path"), py::arg("baud") = 460800, py::arg("flags") = O_RDWR | O_NOCTTY,
+        .def("initSerial", &ClvHd::pyDevice::initSerial, py::arg("path"),
+             py::arg("baud") = 460800, py::arg("flags") = O_RDWR | O_NOCTTY,
              "Initialize the serial connection to the controller board");
-        // .def("setRGB", &ClvHd::pyDevice::setRGB,
-        //      py::arg("id_module"), py::arg("id_led"), py::arg("rgb"),
-        //      "Set the RGB color of the given LED of the given module")
-        // .def("setupADS1293", &ClvHd::pyDevice::setupADS1293,
-        //      py::arg("route_table"), py::arg("chx_enable"), py::arg("chx_high_res"),
-        //      py::arg("chx_high_freq"), py::arg("R1"), py::arg("R2"), py::arg("R3"),
-        //      "Setup the ADS1293 EMG modules in the device")
-        // .def("start_acquisition", &ClvHd::pyDevice::start_acquisition,
-        //      "Start the acquisition of the EMG modules")
-        // .def("read_all", &ClvHd::pyDevice::read_all, "Read all the EMG data");
+    // .def("setRGB", &ClvHd::pyDevice::setRGB,
+    //      py::arg("id_module"), py::arg("id_led"), py::arg("rgb"),
+    //      "Set the RGB color of the given LED of the given module")
+    // .def("setupADS1293", &ClvHd::pyDevice::setupADS1293,
+    //      py::arg("route_table"), py::arg("chx_enable"), py::arg("chx_high_res"),
+    //      py::arg("chx_high_freq"), py::arg("R1"), py::arg("R2"), py::arg("R3"),
+    //      "Setup the ADS1293 EMG modules in the device")
+    // .def("start_acquisition", &ClvHd::pyDevice::start_acquisition,
+    //      "Start the acquisition of the EMG modules")
+    // .def("read_all", &ClvHd::pyDevice::read_all, "Read all the EMG data");
 
-        py::class_<ClvHd::EMG_ADS1293Pack>(m, "EMG_ADS1293Pack")
-
+    py::class_<ClvHd::pyEMG_ADS1293Pack>(m, "EMG_ADS1293Pack")
+        .def(py::init<ClvHd::pyDevice &, int>(), py::arg("device"),
+             py::arg("verbose") = -1)
+        .def("setup", &ClvHd::pyEMG_ADS1293Pack::pysetup,
+             py::arg("route_table"), py::arg("chx_enable"),
+             py::arg("chx_high_res"), py::arg("chx_high_freq"), py::arg("R1"),
+             py::arg("R2"), py::arg("R3"),
+             "Setup the ADS1293 EMG modules in the device")
+        .def("start_acquisition", &ClvHd::pyEMG_ADS1293Pack::start_acquisition,
+             "Start the acquisition of the EMG modules")
+        .def("read_all", &ClvHd::pyEMG_ADS1293Pack::pyread_all,
+             py::arg("fast") = true, "Read all the EMG data from the device");
+        
 }
 
 #endif /* __PY_CLV_HD_HPP__ */
