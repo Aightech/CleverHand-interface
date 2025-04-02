@@ -49,9 +49,9 @@ class SerialController : public Controller
     };
 
     void
-    open(const char *path)
+    open(const char *path, int baud = 460800, int flags = O_RDWR | O_NOCTTY)
     {
-        m_serial.open_connection(path, 460800, O_RDWR | O_NOCTTY);
+        m_serial.open_connection(path, baud, flags);
     };
 
     virtual void

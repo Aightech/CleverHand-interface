@@ -17,12 +17,12 @@ class Device : virtual public ESC::CLI
     ~Device() {};
 
     uint8_t
-    initSerial(const char *path)
+    initSerial(const char *path, int baud = 460800, int flags = O_RDWR | O_NOCTTY)
     {
         if(controller != nullptr)
             delete controller;
         SerialController *c = new SerialController(m_verbose);
-        c->open(path);
+        c->open(path, baud, flags);
         controller = c;
         return this->setup();
     };
