@@ -1,46 +1,51 @@
-# Serial protocol
+## Serial protocol
+
 Each request from the computer to the controller is a 8 bytes long frame. The first byte is always the command, the rest of the bytes depend on the command. 
 
 ### Read 'r' request
 Request to read a register from a module attached to the controller. 
 1. 'r': read commad
-2. id : A mask indicating which module to address. **Note**: 0b0110 address module 1 and 2
-3. reg: register to read
-4. n  : number of bytes to read starting from reg
+2. id : A 32-bits mask indicating which module to address. **Note**: 0b0110 address module 1 and 2
+3. n  : number of bytes to read
+4. nc: number of bytes of the command
+5. cmd: read command to be sent to the module
+
 
 **Note**: The number of bytes replyed by the controller `len` is equal to `n`*N with N the number of modules addressed by the id mask.
 
-<img src="https://svg.wavedrom.com/{signal:[{name:'Tx',wave:'x==|==xxxxxxx',data:['r','id','reg','n']},{name:'Rx',wave:'xxxxxx=|==.|x',data:['ts','len','val']},{node:'..E.F.A.BC..D'}],head:{text:'Read command'},edge:['A+B 8bytes','C+D len bytes','E+F 4 bytes']}"/>
+<img src="https://svg.wavedrom.com/{signal:[{name:'Tx',wave:'x==|===.|xxxxxxx',data:['r','id','n','nc','cmd']},{name:'Rx',wave:'xxxxxxxxx=|==.|x',data:['ts','len','val']},{node:'..E.F.G..A.BC..D'}],head:{text:'Read command'},edge:['A+B 8bytes','C+D len bytes','E+F 4 bytes','G+A nc bytes']}"/>
 
 ```wavedrom
 { signal: [
-  { name: 'Tx', wave: 'x==|==xxxxxxx', data: ['r', 'id', 'reg', 'n']},
-  { name: 'Rx', wave: 'xxxxxx=|==.|x', data: ['ts', 'len', 'val']},
-  {                              node: '..E.F.A.BC..D'}
+  { name: 'Tx', wave: 'x==|===.|xxxxxxx', data: ['r', 'id', 'n', 'nc', 'cmd'] },
+  { name: 'Rx', wave: 'xxxxxxxxx=|==.|x', data: ['ts', 'len', 'val']},
+  {                              node: '..E.F.G..A.BC..D'}
 ],
     head: { text: 'Read command' },
-    edge: [ 'A+B 8bytes', 'C+D len bytes' , 'E+F 4 bytes']
+    edge: [ 'A+B 8bytes', 'C+D len bytes' , 'E+F 4 bytes', 'G+A nc bytes']
 }
 ```
 
 ### Write 'w' request
 Request to write a register from a module attached to the controller. There is no response to this command.
 1. 'w': write command
-2. id : A mask indicating which module to address. **Note**: 0b0110 address module 1 and 2
-3. reg: register to write
-4. n: number of bytes to write starting from reg
-5. val: value to write
+2. id : A 32-bits mask indicating which module to address. **Note**: 0b0110 address module 1 and 2
+3. n  : number of bytes to write
+4. nc: number of bytes of the command
+5. cmd: write command to be sent to the module
+6. val: value to write
 
 
-<img src="https://svg.wavedrom.com/{signal:[{name:'Tx',wave:'x==|===|x',data:['w','id','reg','n','val']},{node:'..A.B.C.D'}],head:{text:'Write command'},edge:['A+B 4 bytes','C+D n bytes']}"/>
+<img src="https://svg.wavedrom.com/{signal:[{name:'Tx',wave:'x==|====.|=|x',data:['w','id','reg','n','nc','cmd','val']},{node:'..A.B..E..C.D'}],head:{text:'Write command'},edge:['A+B 4 bytes','C+D n bytes','E+C nc bytes']}"/>
+
 
 ```wavedrom
 { signal: [
-  { name: 'Tx', wave: 'x==|===|x', data: ['w', 'id', 'reg', 'n', 'val'] },
-  {                              node: '..A.B.C.D'}
+  { name: 'Tx', wave: 'x==|====.|=|x', data: ['w', 'id', 'reg', 'n', 'nc', 'cmd','val'] },
+  {                              node: '..A.B..E..C.D'}
 ],
     head: { text: 'Write command' },
-    edge: [ 'A+B 4 bytes', 'C+D n bytes' ]
+    edge: [ 'A+B 4 bytes', 'C+D n bytes', 'E+C nc bytes']
 }
 ```
 
@@ -114,3 +119,5 @@ Request to know the version of the controller.
     edge: [ 'A+B 8bytes', 'C+D Major', 'D+E Minor' ]
 }
 ```
+
+
