@@ -18,8 +18,7 @@
 #include "clvHd_module.hpp" // Module class
 #include <serial_client.hpp>
 
-#define CLVHD_PACKET_SIZE 6
-#define CLVHD_BUFFER_SIZE 1024
+
 
 namespace ClvHd
 {
@@ -41,7 +40,7 @@ class SerialController : public Controller
 
     public:
     SerialController(int verbose = -1)
-        : ESC::CLI(verbose, "ClvHd-Controller"), m_serial(verbose) {};
+        : ESC::CLI(verbose, "ClvHd-Controller-serial"), m_serial(verbose) {};
     ~SerialController()
     {
         sendCmd('z');

@@ -4,8 +4,8 @@
 #include "clvHd_controller.hpp"
 #include "clvHd_module.hpp"
 
-#include "clvHd_controller_mono.hpp"
 #include "clvHd_controller_serial.hpp"
+#include "clvHd_controller_wifi.hpp"
 
 namespace ClvHd
 {
@@ -17,7 +17,9 @@ class Device : virtual public ESC::CLI
     ~Device() {};
 
     uint8_t
-    initSerial(const char *path, int baud = 460800, int flags = O_RDWR | O_NOCTTY)
+    initSerial(const char *path,
+               int baud = 460800,
+               int flags = O_RDWR | O_NOCTTY)
     {
         if(controller != nullptr)
             delete controller;
@@ -28,11 +30,19 @@ class Device : virtual public ESC::CLI
     };
 
     uint8_t
-    initMono()
+    initWifi()
     {
         if(controller != nullptr)
             delete controller;
-        controller = new MonoController(m_verbose);
+        controller = new WifiController(m_verbose);
+        //cast to WifiController
+        WifiController *clvhd = static_cast<WifiController *>(controller);
+        clvhd->start();
+        while(clvhd->nbClients() < 1)
+        {
+            std::cout << "Waiting for a client to connect..." << std::endl;
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        }
         return this->setup();
     };
 
@@ -40,6 +50,7 @@ class Device : virtual public ESC::CLI
     setup()
     {
         int nb_modules = controller->setup();
+        logln("Number of modules found: " + std::to_string(nb_modules), true);
         for(int i = 0; i < nb_modules; i++)
             addModule(new Module(controller, i, m_verbose));
         return nb_modules;
@@ -62,6 +73,7 @@ class Device : virtual public ESC::CLI
     void
     addModule(Module *module)
     {
+        logln("Adding module " + std::to_string(module->id), true);
         modules.push_back(module);
         sensorValues.push_back(&module->sensorValue);
         actuatorValues.push_back(&module->actuatorValue);

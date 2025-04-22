@@ -445,6 +445,8 @@ class EMG_ADS1293Pack : public ModulePack
         uint8_t *buffer = new uint8_t[16 * this->modules.size()];
 
         uint8_t cmd = ADS1293_Reg::DATA_STATUS_REG | 0b10000000;
+        // log("Reading EMG data from " +
+        //         std::to_string(this->modules.size()) + " modules", true);
         int n = m_device->controller->readCmd_multi(m_mask, 1, &cmd, 16, buffer,
                                                     &timestamp);
         // log("Read " + std::to_string(n) + " bytes", true);

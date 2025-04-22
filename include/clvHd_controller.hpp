@@ -13,6 +13,9 @@
 #include "strANSIseq.hpp"
 #include "clvHd_module.hpp" // Module class
 
+#define CLVHD_PACKET_SIZE 6
+#define CLVHD_BUFFER_SIZE 1024
+
 
 namespace ClvHd
 {

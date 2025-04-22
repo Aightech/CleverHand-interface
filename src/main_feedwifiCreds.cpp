@@ -30,10 +30,15 @@ int main(int argc, char* argv[]) {
     
     cli.logln("Opening serial connection: " + std::string(argv[1]), true);
     Communication::Serial serial(verbose-1);
-    serial.open_connection(argv[1], 115200);
+    serial.open_connection(argv[1], 460800);
     uint8_t size_ssid = ssid.size();
     uint8_t size_password = password.size();
     uint8_t cmd = 'C';
+    cli.logln("Sending credentials", true);
+    cli.logln("Size ssid: " + std::to_string(size_ssid), true);
+    cli.logln("Size password: " + std::to_string(size_password), true);
+    cli.logln("SSID: " + ssid, true);
+    cli.logln("Password: " + password, true);
     serial.writeS(&cmd, 1);
     serial.writeS(&size_ssid, 1);
     serial.writeS(&size_password, 1);
