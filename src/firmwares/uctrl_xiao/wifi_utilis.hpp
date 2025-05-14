@@ -24,7 +24,7 @@ class WifiUtil
                 // delay(500);
                 client.setNoDelay(true);
                 client.connect(server_ip.c_str(), server_port);
-                client.setNoDelay(true);
+                // client.setNoDelay(true);
                 PRINTLN("Connecting to the Server: ") 
                 PRINTLN(server_ip.c_str() + String(":") + String(server_port));
                 delay(500);

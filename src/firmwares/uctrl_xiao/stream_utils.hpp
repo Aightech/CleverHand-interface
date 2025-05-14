@@ -30,6 +30,9 @@ class MyStream
         }
         else
         {
+            if(!m_wifiUtil->foundServer)
+                stream_active = false;
+            
             m_active = isNONE;
             return 0;
         }
@@ -102,6 +105,7 @@ class MyStream
     }
 
 
+    bool stream_active = false;
     private:
     WifiUtil *m_wifiUtil;
     WiFiClient *m_client;

@@ -20,11 +20,8 @@ main(int argc, char *argv[])
         ClvHd::Device device(1);
         device.initWifi();
         std::cout << "Device initialized" << std::endl;
-    //     while(clvhd.nbClients() < 1)
-    // // {
-        // // }
         
-        ClvHd::EMG_ADS1293Pack emg_pack(&device, 5);
+        ClvHd::EMG_ADS1293Pack emg_pack(&device, 3);
         emg_pack.setup();
         
         ClvHd::EMG_ADS1293Config config;
@@ -32,13 +29,16 @@ main(int argc, char *argv[])
         
         emg_pack.start_acquisition();
         std::cout << "EMG modules started" << std::fixed << std::setprecision(3);
-        std::this_thread::sleep_for(std::chrono::milliseconds(3000));
-
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        emg_pack.start_streaming();
+        double prev_time = 0;
         while(true)
         {
             std::vector<ClvHd::Value *> values = emg_pack.read_all();
             double timestamp = values[0]->time_s + values[0]->time_ns / 1000000.0;
-            std::cout << "t: " << timestamp << " ";
+        
+            std::cout << "t: " << timestamp << " dt: " << (timestamp - prev_time) * 1000 << " ms ";
+            prev_time = timestamp;
             for(size_t i = 0; i < emg_pack.modules.size(); i++)
             {
                 std::cout << i << ": [";
@@ -49,8 +49,8 @@ main(int argc, char *argv[])
                 }
                 std::cout << "]\t";
             }
-            std::cout << "\xd" << std::flush;
-            usleep(50000);
+            std::cout << "\n" << std::flush;
+            // usleep(50000);
         }
 
     }

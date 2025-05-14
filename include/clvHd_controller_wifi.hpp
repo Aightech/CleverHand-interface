@@ -35,6 +35,9 @@ class WifiController : public Controller
           serverTCP(TCP_PORT, 10, verbose - 1),
           serverUDP(UDP_PORT, 10, verbose - 1)
     {
+        serverTCP.disable_nagle();
+        serverTCP.disable_quickack();
+
         logln("created", true);
     };
     ~WifiController()
@@ -86,11 +89,48 @@ class WifiController : public Controller
     setup()
     {
         logln("Setup controller board", true);
+        if(m_isStreaming)
+            stop_stream();
         sendCmd('s');
         uint8_t nb = 0;
         readReply(&nb);
         logln("Number of modules found: " + std::to_string(nb), true);
         return nb;
+    };
+
+    virtual void
+    stream(uint32_t mask_id,
+           uint8_t n_cmd,
+           uint8_t *cmd,
+           uint8_t size,
+           uint32_t period_us = 1000) override
+    {
+        if(m_isStreaming)
+            stop_stream();
+        uint8_t msg[10];
+        *(uint32_t *)msg = mask_id;
+        *(uint32_t *)(msg + 4) = period_us;
+        logln("streaming period: " + std::to_string(period_us), true);
+        msg[8] = size;
+        msg[9] = n_cmd;
+        m_isStreaming = true;
+        sendCmd('R');
+        sendCmd(msg, 10);
+        sendCmd(cmd, n_cmd);
+    };
+
+    void
+    stop_stream()
+    {
+        uint8_t msg[6];
+        *(uint32_t *)msg = 0;
+        msg[4] = 0;
+        msg[5] = 0;
+        sendCmd('R');
+        sendCmd(msg, 6);
+        m_isStreaming = false;
+        // clear all clients dequeued data
+        for(auto &cl : m_clients) serverTCP.clear_fifo(cl->socket);
     };
 
     virtual int
@@ -165,7 +205,7 @@ class WifiController : public Controller
             n += m_buffer[8];
         }
         return n;
-    };
+    }
 
     static void
     callbackTCP(Communication::Server *server,
@@ -261,13 +301,16 @@ class WifiController : public Controller
                   const void *buff,
                   uint64_t *timestamp = nullptr) override
     {
-        uint8_t msg[6];
-        *(uint32_t *)msg = mask_id;
-        msg[4] = size;
-        msg[5] = n_cmd;
-        sendCmd('r');
-        sendCmd(msg, 6);
-        sendCmd(cmd, n_cmd);
+        if(!m_isStreaming)
+        { //no need to send the command if we are streaming
+            uint8_t msg[6];
+            *(uint32_t *)msg = mask_id;
+            msg[4] = size;
+            msg[5] = n_cmd;
+            sendCmd('r');
+            sendCmd(msg, 6);
+            sendCmd(cmd, n_cmd);
+        }
         int n = readReply((uint8_t *)buff, timestamp);
         // logln("ReadM " + std::to_string(n) + " bytes", true);
         return n;
@@ -298,6 +341,7 @@ class WifiController : public Controller
     Communication::TCPServer serverTCP;
     Communication::UDPServer serverUDP;
     uint8_t m_buffer[CLVHD_BUFFER_SIZE];
+    bool m_isStreaming = false;
 };
 } // namespace ClvHd
 

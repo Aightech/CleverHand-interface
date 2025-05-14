@@ -18,8 +18,6 @@
 #include "clvHd_module.hpp" // Module class
 #include <serial_client.hpp>
 
-
-
 namespace ClvHd
 {
 class Module;
@@ -74,6 +72,20 @@ class SerialController : public Controller
         else
             return -1; // Error
     };
+
+    virtual void
+    stream(uint32_t mask_id,
+           uint8_t n_cmd,
+           uint8_t *cmd,
+           uint8_t size,
+           uint32_t period_us = 1000) override
+    {
+        (void)mask_id;
+        (void)n_cmd;
+        (void)cmd;
+        (void)size;
+        (void)period_us;
+    }
 
     int
     sendCmd(uint8_t cmd)

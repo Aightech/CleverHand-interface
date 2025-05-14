@@ -149,6 +149,15 @@ cmake .. -DBUILD_EXAMPLES=1 -DBUILD_PYTHON=1
 make
 ```
 
+### Submodules dependencies
+#### libraries
+- [com_client](lib/com_client/README.md) 
+- [strANSIseq](lib/strANSIseq/README.md)
+#### Tools
+- [built_lsl](tool_lib/built_lsl/README.md)
+#### External libraries
+- [pybind11](extern/pybind11/README.rst)
+
 ## Usage
 
 ### C++

@@ -148,7 +148,7 @@ EMG_ADS1293::route_channel(uint8_t channel, uint8_t pos_in, uint8_t neg_in)
 
     channel = (channel > 2) ? 2 : channel;
     uint8_t val = pos_in | (neg_in << 3);
-    if(pos_in == neg_in)
+    if(pos_in == neg_in && pos_in != 0)
         val |= 0xc0;
     m_regs[FLEX_CH0_CN_REG + channel] = val;
     return this->writeReg(FLEX_CH0_CN_REG + channel, val);
