@@ -170,5 +170,9 @@ The library integrates a Python wrapper. To use the library in Python, you need 
 > The Python wrapper is not fully implemented yet. The library is still in development and some features may not be available in the Python wrapper.
 
 
+# CONTRIBUTING
+see [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct, and the process for submitting pull requests to us.
+
+
 
 
