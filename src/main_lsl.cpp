@@ -17,8 +17,8 @@ main(int argc, char *argv[])
         emg_pack.setup();
 
         ClvHd::EMG_ADS1293Config config;
-        config.route_table[0][0] = 4;
-        config.route_table[0][1] = 5;
+        config.route_table[0][0] = 5;
+        config.route_table[0][1] = 4;
         config.route_table[1][0] = 0;
         config.route_table[1][1] = 0;
         config.route_table[2][0] = 0;

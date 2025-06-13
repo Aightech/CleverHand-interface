@@ -151,10 +151,13 @@ make
 
 ### Submodules dependencies
 #### libraries
-- [com_client](lib/com_client/README.md) 
-- [strANSIseq](lib/strANSIseq/README.md)
+- [com_client](./lib/com_client/README.md) 
+- [com_client](./lib/com_client/README.md) 
+- [strANSIseq](./lib/strANSIseq/README.md)
+- [strANSIseq](./lib/strANSIseq/README.md)
 #### Tools
-- [built_lsl](tool_lib/built_lsl/README.md)
+- [built_lsl](./tool_lib/built_lsl/README.md)
+- [built_lsl](./tool_lib/built_lsl/README.md)
 #### External libraries
 - [pybind11](extern/pybind11/README.rst)
 
@@ -164,14 +167,18 @@ make
 There are several examples in the `src` folder. The examples start with `main_` and showcase different features of the library.
 
 ### Python
-The library integrates a Python wrapper. To use the library in Python, you need to build the library with the `-DBUILD_PYTHON=1` option. This will create a `clvhd.so` file in the `build` folder. You can then use this file in your Python code.
+The library integrates a Python wrapper. To use the library in Python, you need to build the library with the `-DBUILD_PYTHON=1` option. This will create a `clvhd.so` file in the `build` folder. You can then use this file in your Python code. See additionnal instructions in [script/description.md](./script/description.md) for more example on how to use the library in Python.
 
 > [!WARNING]
 > The Python wrapper is not fully implemented yet. The library is still in development and some features may not be available in the Python wrapper.
 
 
+# Protocol description
+See the protocol description in the [serial_protocol.md](docs/serial_protocol.md) and [wifi_protocol.md](docs/wifi_protocol.md) files.
+
 # CONTRIBUTING
-see [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct, and the process for submitting pull requests to us.
+see [CONTRIBUTING.md](./CONTRIBUTING.md) for details on our code of conduct, and the process for submitting pull requests to us.
+see [CONTRIBUTING.md](./CONTRIBUTING.md) for details on our code of conduct, and the process for submitting pull requests to us.
 
 
 
