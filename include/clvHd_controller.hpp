@@ -10,9 +10,11 @@
 #include <stdint.h> // uint8_t, uint16_t, uint32_t, uint64_t
 #include <stdio.h>  // Standard input/output definitions
 
-#include "strANSIseq.hpp"
 #include "clvHd_module.hpp" // Module class
+#include "strANSIseq.hpp"
 
+#define CLVHD_PACKET_SIZE 6
+#define CLVHD_BUFFER_SIZE 1024
 
 namespace ClvHd
 {
@@ -28,12 +30,18 @@ class Controller : virtual public ESC::CLI
     // using sec = std::chrono::duration<double>;
 
     public:
-    Controller(int verbose = -1)
-        : ESC::CLI(verbose, "ClvHd-Controller"){};
-    virtual ~Controller(){};
+    Controller(int verbose = -1) : ESC::CLI(verbose, "ClvHd-Controller") {};
+    virtual ~Controller() {};
 
     virtual uint8_t
-    setup()=0;
+    setup() = 0;
+
+    virtual void
+    stream(uint32_t mask_id,
+           uint8_t n_cmd,
+           uint8_t *cmd,
+           uint8_t size,
+           uint32_t period_us = 1000) = 0;
 
     int
     readCmd(uint8_t id,
@@ -63,7 +71,7 @@ class Controller : virtual public ESC::CLI
                   uint8_t *cmd,
                   uint8_t size,
                   const void *buff,
-                  uint64_t *timestamp = nullptr)=0;
+                  uint64_t *timestamp = nullptr) = 0;
 
     /**
      * @brief writeReg write size byte to the module with the given id.
@@ -100,9 +108,10 @@ class Controller : virtual public ESC::CLI
                    uint8_t n_cmd,
                    uint8_t *cmd,
                    uint8_t size = 0,
-                   const void *data = nullptr)=0;
+                   const void *data = nullptr) = 0;
 
-    virtual void setRGB(int id_module, RGBColor &color)=0;
+    virtual void
+    setRGB(int id_module, RGBColor &color) = 0;
 
     /**
      * @brief Get the version of the controller board.
@@ -112,7 +121,6 @@ class Controller : virtual public ESC::CLI
     getVersion(uint8_t *major = nullptr, uint8_t *minor = nullptr);
 
     operator std::string() const { return "Controller board"; };
-
 };
 } // namespace ClvHd
 #endif

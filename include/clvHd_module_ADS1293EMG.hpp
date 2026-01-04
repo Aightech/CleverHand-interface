@@ -72,16 +72,15 @@ class EMG_ADS1293Config
         {1, 2},  // (-) and (+) electrodes of the first channel
         {3, 4},  // (-) and (+) electrodes of the second channel
         {5, 6}}; // (-) and (+) electrodes of the third channel
-    bool chx_high_res[3] = {true, true,
-                            true}; // Enable or disable the high resolution mode
-    bool chx_high_freq[3] = {true, true,
-                             true}; // Enable or disable the high frequency mode
+    bool chx_high_res[3] = {false, false,
+        false}; // Enable or disable the high resolution mode
+    bool chx_high_freq[3] = {false, false,
+        false}; // Enable or disable the high frequency mode
     int R1[3] = {2, 2, 2};          // Gain R1 of the INA channels
     int R2 = 4;                     // Gain R2 of the INA channels
     int R3[3] = {4, 4, 4};          // Gain R3 of the INA channels
     bool clock_intern = true;       // Use internal clock
 };
-
 
 /**
  * @brief The EMG class
@@ -176,10 +175,10 @@ class EMG_ADS1293 : public Module
           int R2,
           int R3[3],
           bool clock_intern = true);
-    
+
     /**
      * @brief route_channel Route the EMG channels to the input electrodes.
-     * 
+     *
      * @param channel Channel to route (0, 1, 2).
      * @param pos_in Positive input electrode (0: unused, 1 to 6: electrode).
      * @param neg_in Negative input electrode (0: unused, 1 to 6: electrode).
@@ -416,7 +415,8 @@ class EMG_ADS1293Pack : public ModulePack
         }
     };
 
-    void configure(EMG_ADS1293Config &config)
+    void
+    configure(EMG_ADS1293Config &config)
     {
         for(size_t i = 0; i < this->modules.size(); i++)
         {
@@ -438,6 +438,22 @@ class EMG_ADS1293Pack : public ModulePack
         }
     };
 
+    void
+    start_streaming()
+    {
+        uint8_t cmd = ADS1293_Reg::DATA_STATUS_REG | 0b10000000;
+        m_device->controller->stream(m_mask, 1, &cmd, 16);
+        m_streaming = true;
+    };
+
+    void
+    stop_streaming()
+    {
+        uint8_t cmd = ADS1293_Reg::DATA_STATUS_REG | 0b10000000;
+        m_device->controller->stream(m_mask, 1, &cmd, 0);
+        m_streaming = false;
+    };
+
     std::vector<Value *> &
     read_all(bool fast = true)
     {
@@ -445,6 +461,8 @@ class EMG_ADS1293Pack : public ModulePack
         uint8_t *buffer = new uint8_t[16 * this->modules.size()];
 
         uint8_t cmd = ADS1293_Reg::DATA_STATUS_REG | 0b10000000;
+        // log("Reading EMG data from " +
+        //         std::to_string(this->modules.size()) + " modules", true);
         int n = m_device->controller->readCmd_multi(m_mask, 1, &cmd, 16, buffer,
                                                     &timestamp);
         // log("Read " + std::to_string(n) + " bytes", true);
@@ -474,9 +492,10 @@ class EMG_ADS1293Pack : public ModulePack
         delete[] buffer;
         return sensorValues;
     };
+
+    private:
+    bool m_streaming = false;
 };
-
-
 
 } // namespace ClvHd
 #endif //CLV_HD_EMG_H
